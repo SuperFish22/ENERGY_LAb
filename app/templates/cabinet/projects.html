@@ -1,7 +1,7 @@
 {% extends "cabinet/_layout.html" %}{% set nav = 'projects' %}
 {% block page_title %}Проекты{% endblock %}
 {% block main %}
-<header><h1 style="font-size:2rem">Проекты мероприятий</h1>{% if user.has_role('member','head') %}<a class="btn btn-launch" href="/cabinet/projects/new">Новый проект</a>{% endif %}</header>
+<header><h1 style="font-size:2rem">Проекты мероприятий</h1><span class="row-actions">{% if user.has_role('head') %}<a class="btn" href="/cabinet/archive/new">Внести прошедшую тусовку</a>{% endif %}{% if user.has_role('member','head') %}<a class="btn btn-launch" href="/cabinet/projects/new">Новый проект</a>{% endif %}</span></header>
 <form class="row-actions" style="margin-bottom:1rem" method="get">
   <input name="q" value="{{ q }}" placeholder="Название или код" style="max-width:260px" aria-label="Поиск">
   <select name="status" style="max-width:240px" aria-label="Статус"><option value="">Все статусы</option>{% for k,v in statuses.items() %}<option value="{{ k }}" {% if k == status %}selected{% endif %}>{{ v[0] }}</option>{% endfor %}</select>

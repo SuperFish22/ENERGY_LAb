@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse, RedirectResponse, Response
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app import export
+from app import export, media
 from app import models as m
 from app.config import settings
 from app.db import get_db
@@ -94,6 +94,89 @@ def _ref(db: Session):
     return {"formats": db.scalars(select(m.EventFormat).order_by(m.EventFormat.code)).all(),
             "venues": db.scalars(select(m.Venue).order_by(m.Venue.name)).all(),
             "ages": ["0+", "6+", "12+", "16+", "18+"]}
+
+
+# ------------------------------------------------------------------ быстрое внесение прошедшей тусовки
+def _num(v, default=None, lo=0.0, hi=1e9):
+    try:
+        x = float(str(v).replace(" ", "").replace("\u00a0", "").replace(",", "."))
+    except (TypeError, ValueError):
+        return default
+    return max(lo, min(hi, x))
+
+
+@router.get("/archive/new")
+def past_new(request: Request, db: Session = Depends(get_db), user: m.User = Depends(current_user)):
+    if not user.has_role("head"):
+        raise HTTPException(403, "Вносить прошедшие тусовки могут руководители")
+    return render(request, "cabinet/past_form.html", {"user": user, "f": request.session.pop("past_form", None) or {},
+                                                       "today": date.today().isoformat(), "nav": "projects",
+                                                       **_ref(db)})
+
+
+@router.post("/archive/new", dependencies=[Depends(csrf)])
+async def past_create(request: Request, db: Session = Depends(get_db), user: m.User = Depends(current_user)):
+    """Прошедшее мероприятие одной формой: сразу «Проанализирован», с фактом и фото —
+    попадает в фотоальбом главной, в прогноз по аналогам и в калькулятор стоимости."""
+    if not user.has_role("head"):
+        raise HTTPException(403)
+    form = await request.form()
+    g = lambda k: (form.get(k) or "").strip() if isinstance(form.get(k) or "", str) else ""  # noqa: E731
+    errors = []
+    title = g("title")[:200]
+    fmt = db.get(m.EventFormat, int(g("format_id"))) if g("format_id").isdigit() else None
+    try:
+        day = date.fromisoformat(g("planned_date"))
+    except ValueError:
+        day = None
+    guests = _num(g("guests_count"))
+    if len(title) < 3:
+        errors.append("Название — от 3 символов")
+    if not fmt:
+        errors.append("Выберите формат")
+    if not day or day > date.today():
+        errors.append("Дата должна быть сегодня или в прошлом")
+    if guests is None or guests < 1:
+        errors.append("Сколько пришло гостей?")
+    rating = _num(g("avg_rating"), None, 1, 5) if g("avg_rating") else None
+    if errors:
+        request.session["past_form"] = {k: g(k) for k in ("title", "format_id", "planned_date", "start_time",
+                                                           "venue_id", "capacity", "ticket_price", "guests_count",
+                                                           "tickets_sold", "revenue", "actual_cost", "avg_rating",
+                                                           "age_rating", "description")}
+        flash(request, ". ".join(errors), "error")
+        return RedirectResponse("/cabinet/archive/new", 303)
+    price = _num(g("ticket_price"), 0)
+    sold = int(_num(g("tickets_sold"), guests))
+    cost = _num(g("actual_cost"), 0)
+    venue = db.get(m.Venue, int(g("venue_id"))) if g("venue_id").isdigit() else None
+    capacity = int(_num(g("capacity"), 0)) or (venue.capacity if venue and venue.capacity else int(guests))
+    ev = m.Event(code=_next_code(db, day.year), title=title, format_id=fmt.id, venue_id=venue.id if venue else None,
+                 author_id=user.id, status="analyzed", planned_date=day, start_time=g("start_time")[:5] or None,
+                 ticket_price=price, planned_budget=cost, capacity=capacity,
+                 age_rating=g("age_rating") if g("age_rating") in ("0+", "6+", "12+", "16+", "18+") else "16+",
+                 description=g("description")[:5000] or None)
+    db.add(ev)
+    db.flush()
+    db.add(m.EventResult(event_id=ev.id, guests_count=int(guests), tickets_sold=sold,
+                         revenue=_num(g("revenue"), price * sold), actual_cost=cost, avg_rating=rating))
+    added = skipped = 0
+    for upload in form.getlist("files"):
+        if not getattr(upload, "filename", ""):
+            continue
+        path = await media.save_image(upload, f"events/{ev.id}")
+        if path:
+            db.add(m.EventPhoto(event_id=ev.id, file=path, order_no=added, is_cover=added == 0, uploaded_by=user.id))
+            added += 1
+        else:
+            skipped += 1
+    audit(db, user.id, "past_event", "event", ev.code)
+    db.commit()
+    msg = f"{ev.code} «{ev.title}» добавлено в альбом прошедших тусовок. Фото: {added}"
+    if skipped:
+        msg += f". Пропущено {skipped}: нужны JPG, PNG или WebP до 8 МБ"
+    flash(request, msg, "warn" if skipped else "ok")
+    return RedirectResponse(f"/cabinet/projects/{ev.id}?tab=photos", 303)
 
 
 @router.get("/projects/new")

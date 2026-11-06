@@ -1,0 +1,27 @@
+# Сервер, где уже работает другой сайт: nginx стоит на самом сервере,
+# Energy Lab слушает только 127.0.0.1:8001, а наружу его отдаёт этот nginx (deploy/nginx-host.conf).
+# Запуск: docker compose -f docker-compose.server.yml up -d --build
+name: energylab
+services:
+  web:
+    build: .
+    env_file: .env
+    restart: unless-stopped
+    depends_on:
+      db: {condition: service_healthy}
+    ports: ["127.0.0.1:8001:8000"]
+    environment:
+      MEDIA_DIR: /app/media
+    volumes: ["media:/app/media"]
+  db:
+    image: postgres:16-alpine
+    env_file: .env
+    restart: unless-stopped
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      retries: 10
+volumes:
+  pgdata:
+  media:

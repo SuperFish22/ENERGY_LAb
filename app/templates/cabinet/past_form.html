@@ -1,0 +1,36 @@
+{% extends "cabinet/_layout.html" %}{% set nav = 'projects' %}
+{% block page_title %}Внести прошедшую тусовку{% endblock %}
+{% block main %}
+<h1 style="font-size:2rem">Внести прошедшую тусовку</h1>
+<p class="muted">Для мероприятий, которые уже прошли. Оно сразу попадёт в «Фотоальбом прошедших тусовок» на главной, в прогноз по аналогам и в калькулятор стоимости — без экспертизы и смены статусов.</p>
+<form method="post" action="/cabinet/archive/new" enctype="multipart/form-data" class="panel">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <h2>Что это было</h2>
+  <div class="grid-2">
+    <div class="field"><label for="pt">Название</label><input id="pt" name="title" required minlength="3" maxlength="200" value="{{ f.title or '' }}"></div>
+    <div class="field"><label for="pf">Формат</label><select id="pf" name="format_id" required><option value="">—</option>{% for x in formats %}{% if not x.code.endswith('0') %}<option value="{{ x.id }}" {% if f.format_id == x.id|string %}selected{% endif %}>{{ x.group_name }} · {{ x.name }}</option>{% endif %}{% endfor %}</select></div>
+    <div class="field"><label for="pd">Дата</label><input id="pd" type="date" name="planned_date" max="{{ today }}" required value="{{ f.planned_date or '' }}"></div>
+    <div class="field"><label for="ps">Начало</label><input id="ps" type="time" name="start_time" value="{{ f.start_time or '' }}"></div>
+    <div class="field"><label for="pv">Площадка</label><select id="pv" name="venue_id"><option value="">—</option>{% for v in venues %}<option value="{{ v.id }}" {% if f.venue_id == v.id|string %}selected{% endif %}>{{ v.name }}{% if v.capacity %} · {{ v.capacity }} мест{% endif %}</option>{% endfor %}</select></div>
+    <div class="field"><label for="pa">Возраст гостей</label><select id="pa" name="age_rating">{% for a in ages %}<option {% if (f.age_rating or '16+') == a %}selected{% endif %}>{{ a }}</option>{% endfor %}</select></div>
+  </div>
+  <div class="field"><label for="pds">Пара слов для гостей</label><textarea id="pds" name="description" rows="3" maxlength="5000" placeholder="Что происходило, чем запомнилось">{{ f.description or '' }}</textarea></div>
+
+  <h2 style="margin-top:1.5rem">Итоги</h2>
+  <div class="grid-3">
+    <div class="field"><label for="pg">Пришло гостей</label><input id="pg" type="number" min="1" name="guests_count" required value="{{ f.guests_count or '' }}"></div>
+    <div class="field"><label for="pc">Мест в зале</label><input id="pc" type="number" min="1" name="capacity" value="{{ f.capacity or '' }}" placeholder="как у площадки"></div>
+    <div class="field"><label for="pr">Оценка гостей, 1–5</label><input id="pr" name="avg_rating" inputmode="decimal" value="{{ f.avg_rating or '' }}" placeholder="например, 4,6"></div>
+    <div class="field"><label for="pp">Цена билета, ₽</label><input id="pp" name="ticket_price" inputmode="decimal" value="{{ f.ticket_price or '0' }}"></div>
+    <div class="field"><label for="pts">Продано билетов</label><input id="pts" type="number" min="0" name="tickets_sold" value="{{ f.tickets_sold or '' }}" placeholder="= гостей"></div>
+    <div class="field"><label for="prv">Выручка, ₽</label><input id="prv" name="revenue" inputmode="decimal" value="{{ f.revenue or '' }}" placeholder="цена × билеты"></div>
+    <div class="field"><label for="pcs">Фактические затраты, ₽</label><input id="pcs" name="actual_cost" inputmode="decimal" value="{{ f.actual_cost or '' }}"></div>
+  </div>
+  <p class="small muted">Затраты и число гостей нужны калькулятору стоимости: из них считаются материалы на гостя для этого формата.</p>
+
+  <h2 style="margin-top:1.5rem">Фотоальбом</h2>
+  <div class="field"><label for="pph">Фото (можно сразу несколько, первое станет обложкой)</label><input id="pph" type="file" name="files" accept="image/jpeg,image/png,image/webp" multiple></div>
+  <p class="small muted">JPG, PNG или WebP до 8 МБ каждое. Публикуйте фото гостей только с их согласия, детей — с согласия родителей. Подписи и обложку можно поменять потом во вкладке «Фотоальбом».</p>
+  <button class="btn btn-launch">Добавить в альбом</button>
+</form>
+{% endblock %}
