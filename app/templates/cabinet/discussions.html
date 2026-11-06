@@ -1,0 +1,16 @@
+{% extends "cabinet/_layout.html" %}{% set nav = 'disc' %}
+{% block page_title %}Обсуждения{% endblock %}
+{% block main %}
+<header><h1 style="font-size:2rem">Обсуждения по отделам</h1></header>
+<nav class="row-actions" style="margin-bottom:1rem" aria-label="Отделы"><a class="chip {{ 'chip-on' if not current }}" href="?dept=all">Все</a>{% for d in departments %}<a class="chip {{ 'chip-on' if current and current.id == d.id }}" href="?dept={{ d.code }}">{{ d.name }}</a>{% endfor %}</nav>
+<div class="cols-2"><section class="panel">
+  {% for d in items %}<div class="task"><div><a href="/cabinet/discussions/{{ d.id }}">{{ d.title }}</a><div class="muted small">{{ d.department.name }} · {{ d.author.full_name if d.author else '—' }} · {{ d.messages|length }} сообщ.{% if d.source != 'web' %} · из {{ 'Telegram' if d.source == 'telegram' else 'ВКонтакте' }}{% endif %}</div></div><span class="status {{ 'status-done' if d.status == 'closed' }}">{{ 'Закрыто' if d.status == 'closed' else 'Открыто' }}</span></div>
+  {% else %}<p class="empty">Здесь пока тихо. Задайте отделу первый вопрос.</p>{% endfor %}
+</section>
+<form method="post" class="panel"><h2>Вопрос на обсуждение</h2><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <div class="field"><label for="dd">Отдел</label><select id="dd" name="department_id">{% for d in departments %}<option value="{{ d.id }}" {% if current and current.id == d.id %}selected{% endif %}>{{ d.name }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="dt">Вопрос</label><input id="dt" name="title" required minlength="3"></div>
+  <div class="field"><label for="dx">Подробности</label><textarea id="dx" name="text"></textarea></div>
+  <div class="field"><label for="de">Проект</label><select id="de" name="event_id"><option value="">—</option>{% for e in events %}<option value="{{ e.id }}">{{ e.title }}</option>{% endfor %}</select></div>
+  <button class="btn btn-launch">Задать вопрос</button></form></div>
+{% endblock %}

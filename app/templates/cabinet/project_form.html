@@ -1,0 +1,11 @@
+{% extends "cabinet/_layout.html" %}{% set nav = 'projects' %}
+{% block page_title %}Новый проект{% endblock %}
+{% block main %}
+<h1 style="font-size:2rem">Новый проект</h1>
+<p class="muted">Опишите идею. Станции добавите на следующем шаге, затем отправите проект на предстартовые проверки.</p>
+{% if errors %}<div class="flash error" role="alert">{{ errors|join('; ') }}</div>{% endif %}
+<form method="post" class="panel"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  {% include "partials/project_fields.html" %}
+  <button class="btn btn-launch">Создать проект</button>
+</form>
+{% endblock %}

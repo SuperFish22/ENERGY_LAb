@@ -1,0 +1,12 @@
+{% extends "cabinet/_layout.html" %}{% set nav = 'questions' %}
+{% block page_title %}Доска и SOS{% endblock %}
+{% block main %}
+<h1 style="font-size:2rem">Доска вопросов и SOS</h1>
+<div class="panel table-wrap" style="padding:0"><table><thead><tr><th>Когда</th><th>Вопрос</th><th>Канал</th><th>Статус</th><th>Действие</th></tr></thead><tbody>
+{% for q in questions %}<tr><td class="muted small">{{ q.created_at.strftime('%d.%m %H:%M') }}</td>
+  <td>{% if q.status == 'sos' %}<b class="zone-red">SOS</b> {% endif %}{{ q.text }}<div class="muted small">{{ q.category }}{% if q.author_name %} · {{ q.author_name }}{% endif %}</div>{% if q.answer %}<div class="muted small">Ответ: {{ q.answer }}</div>{% endif %}</td>
+  <td>{{ {'web':'Сайт','telegram':'Telegram','vk':'ВКонтакте'}[q.channel] }}</td><td>{{ {'pending':'На проверке','approved':'Опубликован','answered':'С ответом','rejected':'Отклонён','sos':'SOS'}[q.status] }}</td>
+  <td>{% if q.status == 'pending' %}<form method="post" action="/cabinet/admin/questions/{{ q.id }}" class="row-actions"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn btn-small" name="action" value="approve">Опубликовать</button><button class="btn btn-small" name="action" value="reject">Отклонить</button><input name="answer" placeholder="Ответ" aria-label="Ответ" style="max-width:14rem"><button class="btn btn-small" name="action" value="answer">Ответить</button></form>{% endif %}</td></tr>
+{% else %}<tr><td colspan="5" class="empty">Вопросов нет.</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

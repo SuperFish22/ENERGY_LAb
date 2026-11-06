@@ -1,0 +1,9 @@
+{% set path = ['draft','review','evaluated','approved','on_sale','held','analyzed'] %}
+{% set pos = path.index(ev.status) if ev.status in path else (1 if ev.status == 'rework' else -1) %}
+<ol class="tracker" aria-label="Этапы запуска">
+  {% for s in path %}
+  <li class="{{ 'passed' if loop.index0 < pos else ('now' if loop.index0 == pos else '') }}" {% if loop.index0 == pos %}aria-current="step"{% endif %}>{{ statuses[s][1] }}</li>
+  {% endfor %}
+</ol>
+{% if ev.status == 'rework' %}<p class="flash warn">Проект возвращён на доработку. После правок отправьте его на экспертизу снова.</p>{% endif %}
+{% if ev.status == 'rejected' %}<p class="flash error">Старт отменён руководителем.</p>{% endif %}

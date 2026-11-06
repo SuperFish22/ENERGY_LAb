@@ -1,0 +1,178 @@
+{
+  "name": "Energy Lab — VK-бот (вход)",
+  "nodes": [
+    {
+      "id": "97141ae1-f532-5e55-b02a-ae7804efeea5",
+      "name": "VK: вебхук",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "energy-lab-vk",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "72d322cf-6984-51a8-a78e-c6accfc68695",
+      "name": "VK: разбор",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        200
+      ],
+      "parameters": {
+        "jsCode": "// VK Callback API: confirmation — вернуть строку подтверждения; message_new — передать в разбор\nconst b = $json.body || {};\nif (b.type === 'confirmation') return [{ json: { confirm: true } }];\nif (b.secret !== $env.VK_SECRET) return [];\nconst o = (b.object && b.object.message) || {};\nlet text = o.text || '';\nconst payload = o.payload ? JSON.parse(o.payload) : null;\nreturn [{ json: { confirm: false, peer: o.peer_id, user_id: String(o.from_id), text, payload } }];\n"
+      }
+    },
+    {
+      "id": "78f7c070-a680-5427-9c5d-176ddd518fd0",
+      "name": "Подтверждение?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.confirm }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "8c8d874a-f283-5a33-be0d-6fe7bd98070f",
+      "name": "Ответ: строка подтверждения",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        100
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $env.VK_CONFIRMATION }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "3b7fb383-2fe3-5a94-ad5a-06b8b2b6b7a7",
+      "name": "Ответ: ok",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "ok",
+        "options": {}
+      }
+    },
+    {
+      "id": "12d90ce2-dcb8-5e33-bdb5-d7d18b38a8b4",
+      "name": "Передать в общий разбор",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        300
+      ],
+      "parameters": {
+        "source": "parameter",
+        "workflowJson": "",
+        "mode": "each",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "VK: вебхук": {
+      "main": [
+        [
+          {
+            "node": "VK: разбор",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VK: разбор": {
+      "main": [
+        [
+          {
+            "node": "Подтверждение?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Подтверждение?": {
+      "main": [
+        [
+          {
+            "node": "Ответ: строка подтверждения",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ответ: ok",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ответ: ok": {
+      "main": [
+        [
+          {
+            "node": "Передать в общий разбор",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Moscow"
+  },
+  "tags": [
+    {
+      "name": "energy-lab"
+    },
+    {
+      "name": "vk"
+    }
+  ],
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "pinData": {}
+}

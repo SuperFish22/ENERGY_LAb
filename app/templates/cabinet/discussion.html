@@ -1,0 +1,8 @@
+{% extends "cabinet/_layout.html" %}{% set nav = 'disc' %}
+{% block page_title %}{{ d.title }}{% endblock %}
+{% block main %}
+<header><div><p class="muted" style="margin:0">{{ d.department.name }}{% if d.event %} · {{ d.event.title }}{% endif %}</p><h1 style="font-size:1.8rem;margin:.2rem 0">{{ d.title }}</h1></div>
+{% if d.author_id == user.id or user.has_role('head') %}<form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn" name="action" value="{{ 'reopen' if d.status == 'closed' else 'close' }}">{{ 'Открыть снова' if d.status == 'closed' else 'Закрыть вопрос' }}</button></form>{% endif %}</header>
+<section class="panel">{% for msg in d.messages %}<div class="msg"><div class="who">{{ msg.author.full_name if msg.author else '—' }} · {{ msg.created_at.strftime('%d.%m %H:%M') }}{% if msg.source != 'web' %} · из {{ 'Telegram' if msg.source == 'telegram' else 'ВКонтакте' }}{% endif %}</div><p style="margin:.2rem 0;white-space:pre-line">{{ msg.text }}</p></div>{% else %}<p class="empty">Сообщений нет.</p>{% endfor %}</section>
+{% if d.status == 'open' %}<form method="post" class="panel"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><div class="field"><label for="rp">Ответ</label><textarea id="rp" name="text" required></textarea></div><button class="btn btn-launch">Ответить</button></form>{% endif %}
+{% endblock %}

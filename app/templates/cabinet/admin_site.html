@@ -1,0 +1,96 @@
+{% extends "cabinet/_layout.html" %}{% set nav = 'site' %}
+{% block page_title %}Главная страница{% endblock %}
+{% block main %}
+<h1 style="font-size:2rem">Главная страница</h1>
+<p class="muted">Всё, что здесь меняется, сразу видно покупателям на <a href="/" target="_blank" rel="noopener">главной</a>.</p>
+<nav class="tabs" aria-label="Разделы настроек"><a href="#team">Команда в слайдере</a><a href="#texts">Тексты</a><a href="#pricing">Калькулятор стоимости</a></nav>
+
+<!-- ============ Команда ============ -->
+<section class="panel" id="team">
+  <h2>Команда в слайдере «Кто создаёт тусовки»</h2>
+  <p class="small muted">На главной показываются только карточки с галочками «Показывать» и «Есть согласие». Фото и имя человека — персональные данные: публикуйте их только с его письменного согласия, детей — с согласия родителей. Фото: JPG, PNG или WebP до 8 МБ, лучше вертикальное 4:5.</p>
+
+  {% for t in team %}
+  <form method="post" action="/cabinet/admin/site/team/{{ t.id }}" enctype="multipart/form-data" class="team-row">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="team-thumb">{% if t.photo %}<img src="/media/{{ t.photo }}" alt="">{% else %}<span>{{ t.full_name[:1] }}</span>{% endif %}</div>
+    <div class="team-fields">
+      <div class="grid-3">
+        <div class="field"><label for="tn{{ t.id }}">Имя и фамилия</label><input id="tn{{ t.id }}" name="full_name" value="{{ t.full_name }}" required maxlength="150"></div>
+        <div class="field"><label for="tr{{ t.id }}">Роль на сайте</label><input id="tr{{ t.id }}" name="role" value="{{ t.role }}" maxlength="120"></div>
+        <div class="field"><label for="td{{ t.id }}">Отдел</label><select id="td{{ t.id }}" name="department_id"><option value="">—</option>{% for d in departments %}<option value="{{ d.id }}" {% if t.department_id == d.id %}selected{% endif %}>{{ d.name }}</option>{% endfor %}</select></div>
+      </div>
+      <div class="field"><label for="tb{{ t.id }}">Пара слов о человеке</label><input id="tb{{ t.id }}" name="bio" value="{{ t.bio or '' }}" maxlength="400"></div>
+      <div class="grid-3">
+        <div class="field"><label for="tu{{ t.id }}">Учётная запись (необязательно)</label><select id="tu{{ t.id }}" name="user_id"><option value="">—</option>{% for u in users %}<option value="{{ u.id }}" {% if t.user_id == u.id %}selected{% endif %}>{{ u.full_name }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="tp{{ t.id }}">Заменить фото</label><input id="tp{{ t.id }}" type="file" name="photo" accept="image/jpeg,image/png,image/webp"></div>
+        <div class="field checks"><label><input type="checkbox" name="is_public" value="1" {% if t.is_public %}checked{% endif %}> Показывать</label><label><input type="checkbox" name="consent" value="1" {% if t.consent %}checked{% endif %}> Есть согласие</label></div>
+      </div>
+      <div class="row-actions">
+        <button class="btn btn-small btn-launch" name="action" value="save">Сохранить</button>
+        <button class="btn btn-small" name="action" value="up" aria-label="Выше" {% if loop.first %}disabled{% endif %}>↑</button>
+        <button class="btn btn-small" name="action" value="down" aria-label="Ниже" {% if loop.last %}disabled{% endif %}>↓</button>
+        {% if t.photo %}<button class="btn btn-small" name="action" value="drop_photo">Убрать фото</button>{% endif %}
+        <button class="btn btn-small" name="action" value="delete">Удалить</button>
+        {% if not (t.is_public and t.consent) %}<span class="status status-rework">не на сайте</span>{% endif %}
+      </div>
+    </div>
+  </form>
+  {% else %}<p class="empty">Пока никого. Пока список пуст, на главной показываются пять отделов.</p>{% endfor %}
+
+  <form method="post" action="/cabinet/admin/site/team" enctype="multipart/form-data" class="team-add">
+    <h3>Добавить человека</h3>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="grid-3">
+      <div class="field"><label for="nn">Имя и фамилия</label><input id="nn" name="full_name" required maxlength="150"></div>
+      <div class="field"><label for="nr">Роль на сайте</label><input id="nr" name="role" placeholder="Например: сценарист, ведущий" maxlength="120"></div>
+      <div class="field"><label for="nd">Отдел</label><select id="nd" name="department_id"><option value="">—</option>{% for d in departments %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}</select></div>
+    </div>
+    <div class="field"><label for="nb">Пара слов о человеке</label><input id="nb" name="bio" maxlength="400"></div>
+    <div class="grid-3">
+      <div class="field"><label for="nu">Учётная запись (необязательно)</label><select id="nu" name="user_id"><option value="">—</option>{% for u in users %}<option value="{{ u.id }}">{{ u.full_name }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="np">Фото</label><input id="np" type="file" name="photo" accept="image/jpeg,image/png,image/webp"></div>
+      <div class="field checks"><label><input type="checkbox" name="is_public" value="1" checked> Показывать</label><label><input type="checkbox" name="consent" value="1"> Есть согласие</label></div>
+    </div>
+    <button class="btn btn-launch">Добавить</button>
+  </form>
+</section>
+
+<!-- ============ Тексты ============ -->
+<form method="post" action="/cabinet/admin/site/texts" class="panel" id="texts">
+  <h2>Тексты главной</h2>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  {% for key, label in labels.items() %}
+  <div class="field"><label for="tx-{{ key }}">{{ label }}</label>
+    {% if key in ('lead', 'request_intro', 'crew_intro') %}<textarea id="tx-{{ key }}" name="{{ key }}" maxlength="1000" style="min-height:4.5em">{{ texts[key] }}</textarea>{% else %}<input id="tx-{{ key }}" name="{{ key }}" value="{{ texts[key] }}" maxlength="300">{% endif %}
+  </div>
+  {% endfor %}
+  <p class="small muted">Пустое поле — вернётся текст по умолчанию.</p>
+  <button class="btn btn-launch">Сохранить тексты</button>
+</form>
+
+<!-- ============ Калькулятор ============ -->
+<form method="post" action="/cabinet/admin/site/pricing" class="panel" id="pricing">
+  <h2>Калькулятор стоимости</h2>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <p class="small muted">Стоимость = (материалы на гостя × гости + команда × часы + доп. услуги) × (1 + доля на развитие). Материалы на гостя берутся из «разборов полёта» формата, если их не меньше указанного числа; иначе — норматив ниже.</p>
+  <div class="grid-3">
+    <div class="field"><label for="p-team">Команда, ₽ за час</label><input id="p-team" name="team_per_hour" inputmode="numeric" value="{{ pricing.team_per_hour }}"></div>
+    <div class="field"><label for="p-hours">Длительность по умолчанию, ч</label><input id="p-hours" name="hours_default" inputmode="decimal" value="{{ pricing.hours_default }}"></div>
+    <div class="field"><label for="p-min">Минимум гостей в расчёте</label><input id="p-min" name="min_guests" inputmode="numeric" value="{{ pricing.min_guests }}"></div>
+    <div class="field"><label for="p-margin">Развитие Lab, %</label><input id="p-margin" name="margin" inputmode="decimal" value="{{ (pricing.margin*100)|round(1) }}"></div>
+    <div class="field"><label for="p-hist">Сколько разборов нужно, чтобы брать данные из истории</label><input id="p-hist" name="min_history" inputmode="numeric" value="{{ pricing.min_history }}"></div>
+  </div>
+  <fieldset class="fs"><legend>Норматив материалов на гостя, ₽</legend>
+    <div class="grid-3">{% for g, v in pricing.base_per_guest.items() %}<div class="field"><label for="pb{{ loop.index0 }}">{{ g }}</label><input id="pb{{ loop.index0 }}" name="base_{{ loop.index0 }}" inputmode="numeric" value="{{ v }}"></div>{% endfor %}</div>
+  </fieldset>
+  <fieldset class="fs"><legend>Дополнительные услуги</legend>
+    {% for key, opt in pricing.options.items() %}
+    <div class="grid-2"><div class="field"><label for="on{{ loop.index }}">Название</label><input id="on{{ loop.index }}" name="opt_name" value="{{ opt[0] }}" maxlength="60"></div><div class="field"><label for="op{{ loop.index }}">Цена, ₽</label><input id="op{{ loop.index }}" name="opt_price" inputmode="numeric" value="{{ opt[1] }}"></div></div>
+    {% endfor %}
+    {% for k in range(2) %}<div class="grid-2"><div class="field"><label for="onn{{ k }}">Новая услуга</label><input id="onn{{ k }}" name="opt_name" maxlength="60"></div><div class="field"><label for="opn{{ k }}">Цена, ₽</label><input id="opn{{ k }}" name="opt_price" inputmode="numeric"></div></div>{% endfor %}
+    <p class="small muted">Чтобы убрать услугу, сотрите её название.</p>
+  </fieldset>
+  <button class="btn btn-launch">Сохранить калькулятор</button>
+</form>
+{% endblock %}

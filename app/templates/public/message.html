@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — Energy Lab{% endblock %}
+{% block body %}
+{% include "partials/public_top.html" %}
+<main class="wrap" style="padding:56px 24px 96px;max-width:720px">
+  <h1>{{ title }}</h1>
+  <p class="muted">{{ text }}</p>
+  <p><a class="btn" href="/">На главную</a> {% if user %}<a class="btn" href="/cabinet">В кабинет</a>{% endif %}</p>
+</main>
+{% endblock %}

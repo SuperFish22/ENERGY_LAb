@@ -1,0 +1,157 @@
+{
+  "name": "Energy Lab — дублирование в Google Таблицу",
+  "nodes": [
+    {
+      "id": "7d54db6d-e618-5bc8-b050-d3a57cb5bcef",
+      "name": "Каждую ночь 02:30",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 2 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "07326081-a238-52f7-b9a7-e18ff2b9b627",
+      "name": "API: реестр",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        200
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.LAB_URL }}/api/bot/export/registry",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": false
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Energy Lab Bot API"
+        }
+      }
+    },
+    {
+      "id": "aec4f744-bb23-5e7a-9a32-c2059cbf9348",
+      "name": "Строки",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        200
+      ],
+      "parameters": {
+        "jsCode": "return ($json.rows || []).map(r => ({ json: r }));"
+      }
+    },
+    {
+      "id": "3f479cdf-8097-5252-9020-d5c5d58c09ca",
+      "name": "Google Таблица: реестр",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        660,
+        200
+      ],
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GSHEET_REGISTRY_ID }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Реестр"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "matchingColumns": [
+            "CODE"
+          ],
+          "value": {}
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "",
+          "name": "Google сервисный аккаунт"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Каждую ночь 02:30": {
+      "main": [
+        [
+          {
+            "node": "API: реестр",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API: реестр": {
+      "main": [
+        [
+          {
+            "node": "Строки",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Строки": {
+      "main": [
+        [
+          {
+            "node": "Google Таблица: реестр",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Moscow"
+  },
+  "tags": [
+    {
+      "name": "energy-lab"
+    },
+    {
+      "name": "google"
+    }
+  ],
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "pinData": {}
+}

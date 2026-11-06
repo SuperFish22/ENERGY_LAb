@@ -1,0 +1,33 @@
+# Сервер HOSTKEY (РФ). Запуск: docker compose -f docker-compose.prod.yml up -d
+services:
+  web:
+    image: ${IMAGE}
+    env_file: .env
+    restart: unless-stopped
+    depends_on:
+      db: {condition: service_healthy}
+    expose: ["8000"]
+    environment:
+      MEDIA_DIR: /app/media
+    volumes: ["media:/app/media"]
+  db:
+    image: postgres:16-alpine
+    env_file: .env
+    restart: unless-stopped
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      retries: 10
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - ./deploy/certbot-www:/var/www/certbot:ro
+    depends_on: [web]
+volumes:
+  pgdata:
+  media:

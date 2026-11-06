@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Оценка: {{ ev.title }}{% endblock %}
+{% block body %}
+{% include "partials/public_top.html" %}
+<main class="wrap" style="max-width:720px;padding-bottom:64px">
+  <h1>Как прошёл полёт?</h1>
+  <p class="muted">{{ ev.title }}, {{ ev.planned_date|date_long }}. Анкета займёт пару минут.</p>
+  {% include "partials/flash.html" %}
+  {% if not is_open %}
+  <p>Анкета закрыта: она доступна 7 дней после мероприятия.</p>
+  {% else %}
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <fieldset class="field" style="border:0;padding:0"><legend>Мероприятие в целом</legend>
+      <div class="scale">{% for i in range(1,6) %}<label><input type="radio" name="rating" value="{{ i }}" required><span>{{ i }}</span></label>{% endfor %}</div>
+    </fieldset>
+    {% for st in ev.stations %}
+    <fieldset class="field" style="border:0;padding:0"><legend>{{ st.title }} <span class="muted small">(можно пропустить)</span></legend>
+      <div class="scale">{% for i in range(1,6) %}<label><input type="radio" name="st_{{ st.id }}" value="{{ i }}"><span>{{ i }}</span></label>{% endfor %}</div>
+    </fieldset>
+    {% endfor %}
+    <div class="field"><label for="nps">Насколько вероятно, что вы порекомендуете нас другу? (0–10)</label>
+      <input id="nps" name="nps" type="number" min="0" max="10" inputmode="numeric"></div>
+    <div class="field"><label for="comment">Что запомнилось, что улучшить</label><textarea id="comment" name="comment" maxlength="2000"></textarea></div>
+    <div class="field"><label for="email">E-mail из билета — чтобы мы связали анкету с билетом (необязательно)</label>
+      <input id="email" name="email" type="email" autocomplete="email"></div>
+    <p class="small muted">Отправляя анкету, вы соглашаетесь с <a href="/privacy">политикой обработки персональных данных</a>.</p>
+    <button class="btn btn-launch">Отправить оценку</button>
+  </form>
+  {% endif %}
+</main>
+{% endblock %}

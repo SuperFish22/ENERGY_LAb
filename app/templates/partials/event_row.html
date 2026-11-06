@@ -1,0 +1,5 @@
+<li>
+  <span class="when">{{ ev.planned_date|date_long }}{% if ev.start_time %}, {{ ev.start_time }}{% endif %}</span>
+  <span class="what"><a href="/e/{{ ev.code }}">{{ ev.title }}</a><br><span class="muted small">{{ ev.format.name }}{% if ev.venue %} · {{ ev.venue.name }}{% endif %} · <span class="age">{{ ev.age_rating }}</span></span></span>
+  <span class="price">{% if ev.ticket_price and ev.ticket_price > 0 %}{{ ev.ticket_price|money }}{% else %}Вход свободный{% endif %}</span>
+</li>

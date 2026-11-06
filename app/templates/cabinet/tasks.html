@@ -1,0 +1,20 @@
+{% extends "cabinet/_layout.html" %}{% set nav = 'tasks' %}
+{% block page_title %}Задачи{% endblock %}
+{% block main %}
+<header><h1 style="font-size:2rem">Задачи</h1>{% if user.has_role('head') %}<nav class="row-actions"><a class="chip {{ 'chip-on' if scope == 'mine' }}" href="?scope=mine">Мои</a><a class="chip {{ 'chip-on' if scope == 'all' }}" href="?scope=all">Все</a></nav>{% endif %}</header>
+<div class="cols-2"><section class="panel">
+  {% for t in tasks %}
+  <div class="task"><div><div>{{ t.title }}</div><div class="muted small">{{ t.assignee.full_name if t.assignee else '—' }}{% if t.event %} · {{ t.event.title }}{% endif %}{% if t.department %} · {{ t.department.name }}{% endif %}{% if t.due_date %} · <span class="{{ 'overdue' if t.due_date|days_left < 0 and t.status != 'done' }}">до {{ t.due_date|ru_date }}</span>{% endif %}</div></div>
+    <form method="post" action="/cabinet/tasks/{{ t.id }}/status"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="back" value="/cabinet/tasks?scope={{ scope }}">
+      <label class="sr" for="ts{{ t.id }}">Статус</label><select id="ts{{ t.id }}" name="status" onchange="this.form.submit()">{% for k,v in statuses.items() %}<option value="{{ k }}" {% if t.status == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select><noscript><button class="btn btn-small">OK</button></noscript></form></div>
+  {% else %}<p class="empty">Задач нет.</p>{% endfor %}
+</section>
+<form method="post" class="panel"><h2>Новая задача</h2><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <div class="field"><label for="tt">Задача</label><input id="tt" name="title" required></div>
+  <div class="field"><label for="ta">Исполнитель</label><select id="ta" name="assignee_id">{% for u in users %}<option value="{{ u.id }}" {% if u.id == user.id %}selected{% endif %}>{{ u.full_name }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="te">Проект</label><select id="te" name="event_id"><option value="">—</option>{% for e in events %}<option value="{{ e.id }}">{{ e.title }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="tdp">Отдел</label><select id="tdp" name="department_id"><option value="">—</option>{% for d in departments %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="tdd">Срок</label><input id="tdd" type="date" name="due_date"></div>
+  <button class="btn btn-launch">Поставить задачу</button>
+  <p class="small muted" style="margin-top:.8rem">Исполнитель получит уведомление в бот и увидит задачу командой «Мои задачи».</p></form></div>
+{% endblock %}

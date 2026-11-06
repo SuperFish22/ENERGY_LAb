@@ -1,0 +1,27 @@
+{% extends "cabinet/_layout.html" %}{% set nav = 'requests' %}
+{% block page_title %}Заявки на тусовки{% endblock %}
+{% block main %}
+<h1 style="font-size:2rem">Заявки на тусовки</h1>
+<p class="muted">Заявки покупателей с главной страницы. Контакты видят только руководители; в бот и n8n они не уходят.</p>
+<nav class="tabs" aria-label="Фильтр по статусу"><a href="/cabinet/requests" {% if not status %}aria-current="page"{% endif %}>Все</a>{% for k, v in statuses.items() %}<a href="?status={{ k }}" {% if status == k %}aria-current="page"{% endif %}>{{ v }}</a>{% endfor %}</nav>
+{% for r in items %}
+<section class="panel">
+  <h2 style="font-size:1.15rem">№{{ r.id }} · {{ r.occasion }} · {{ r.guests }} гостей <span class="status {{ 'status-rework' if r.status == 'new' else 'status-done' if r.status == 'done' else '' }}">{{ statuses[r.status] }}</span></h2>
+  <dl class="kpi">
+    <div><b>{{ r.name }}</b><span>{{ r.contact }}</span></div>
+    <div><b>{{ r.wish_date|ru_date if r.wish_date else 'дата открыта' }}</b><span>желаемая дата</span></div>
+    <div><b>{{ r.format.name if r.format else 'любой формат' }}</b><span>{{ r.age_group or 'возраст не указан' }}</span></div>
+    <div><b>{{ r.estimate|money if r.estimate else '—' }}</b><span>оценка калькулятора{% if r.budget %} · бюджет {{ r.budget|money }}{% endif %}</span></div>
+  </dl>
+  {% if r.message %}<p>{{ r.message }}</p>{% endif %}
+  <p class="small muted">Поступила {{ r.created_at|ru_date }} {{ r.created_at.strftime('%H:%M') }}</p>
+  <form method="post" action="/cabinet/requests/{{ r.id }}" class="grid-3">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label for="st{{ r.id }}">Статус</label><select id="st{{ r.id }}" name="status">{% for k, v in statuses.items() %}<option value="{{ k }}" {% if r.status == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></div>
+    <div class="field"><label for="mg{{ r.id }}">Кто ведёт</label><select id="mg{{ r.id }}" name="manager_id"><option value="">—</option>{% for h in heads %}<option value="{{ h.id }}" {% if r.manager_id == h.id %}selected{% endif %}>{{ h.full_name }}</option>{% endfor %}</select></div>
+    <div class="field"><label for="nt{{ r.id }}">Заметка</label><input id="nt{{ r.id }}" name="note" value="{{ r.note or '' }}" maxlength="500"></div>
+    <div><button class="btn">Сохранить</button></div>
+  </form>
+</section>
+{% else %}<p class="empty">Заявок нет.</p>{% endfor %}
+{% endblock %}

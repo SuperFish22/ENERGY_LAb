@@ -1,0 +1,291 @@
+/* Главная Energy Lab: путешествие к «планете идей».
+   Соединяет макет заказчика (капсула-шапка, планета с кольцом, станции на орбите, слайдер, форма-сигнал, экипаж)
+   с дизайн-системой кабинета (ночное небо, Unbounded + Golos Text, красный ENERGY для старта). */
+:root {
+  --cyan: #69ddd9;
+  --orange: #ffb547;
+  --blue: #3b48dd;
+  --glass: #18214dd9;
+  --glass-line: #ffffff1a;
+}
+body.home-page, body { background-color: var(--night); }
+
+.c-cyan { color: var(--cyan); }
+.c-orange { color: var(--orange); }
+
+.btn-flame { background: var(--orange); border-color: var(--orange); color: #1b1640; font-weight: 600; border-radius: 999px; }
+.btn-flame:hover { background: #ffc56b; border-color: #ffc56b; color: #1b1640; }
+.btn-glass { border-radius: 999px; background: #ffffff10; border-color: #ffffff2e; }
+.btn-glass:hover { background: #ffffff1c; }
+
+/* ---------- герой ---------- */
+.hero-journey { position: relative; display: grid; grid-template-columns: 1.05fr .95fr; gap: 24px 40px; align-items: center;
+  min-height: min(88vh, 820px); padding-block: 40px 72px; }
+.eyebrow { display: inline-block; margin: 0 0 1.1rem; padding: .45em 1em; border-radius: 999px; border: 1px solid var(--glass-line);
+  background: #ffffff0d; color: var(--mist); font-size: .9rem; }
+.hero-title { font-size: clamp(2.5rem, 6.4vw, 5rem); line-height: 1.02; font-weight: 700; letter-spacing: -.02em; max-width: 12ch; margin-bottom: .45em; }
+.hero-journey .lead { color: var(--mist); font-size: 1.15rem; max-width: 46ch; }
+.hero-journey .actions { display: flex; gap: .7rem; flex-wrap: wrap; margin-top: 1.6rem; }
+
+.planet-stage { position: relative; justify-self: center; width: min(100%, 520px); }
+.planet { width: 100%; height: auto; overflow: visible; }
+.planet-label { position: absolute; left: 50%; top: 44%; transform: translate(-42%, -50%) rotate(-4deg);
+  background: #f4f2ff; color: var(--blue); border-radius: 20px; padding: .55em .9em .5em; box-shadow: 0 18px 40px #00000059;
+  font-family: var(--display); font-weight: 700; line-height: .95; text-align: right; }
+.planet-label span:first-child { display: block; font-size: clamp(1.8rem, 4.4vw, 3rem); letter-spacing: -.02em; }
+.planet-label span:last-child { display: block; color: #f59d27; font-size: clamp(1.2rem, 2.6vw, 1.8rem); }
+
+.hero-countdown { grid-column: 1 / -1; justify-self: start; display: flex; align-items: center; gap: 1rem; text-decoration: none;
+  padding: .7rem 1.2rem .7rem .9rem; border-radius: 999px; border: 1px solid var(--glass-line); background: var(--glass); }
+.hero-countdown .t-minus { font-family: var(--display); font-weight: 700; font-size: 1.9rem; color: var(--ignite); line-height: 1; }
+.hero-countdown .hc-body b { display: block; }
+.hero-countdown .hc-body span { color: var(--mist); font-size: .9rem; }
+.hero-countdown:hover { border-color: #ffffff40; }
+
+/* ---------- маршрут: линия орбиты и ракета ---------- */
+.route { position: relative; padding-block: 24px 96px; }
+.route-line { position: absolute; top: 0; bottom: 60px; left: 50%; width: 4px; margin-left: -2px; border-radius: 4px;
+  background: linear-gradient(#69ddd933, #ffb54733, #3b48dd33); }
+.route-fill { position: absolute; inset: 0 0 auto; height: var(--p, 0%); border-radius: 4px;
+  background: linear-gradient(var(--cyan), var(--orange)); box-shadow: 0 0 14px #69ddd980; }
+.route-rocket { position: absolute; left: 50%; top: var(--p, 0%); width: 34px; height: 61px; transform: translate(-50%, -88%); filter: drop-shadow(0 6px 14px #0007); }
+.route-rocket .flame { transform-origin: 20px 53px; }
+
+.station { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; margin-block: 0 88px; }
+.station::before { content: ""; position: absolute; left: 50%; top: 40px; width: 22px; height: 22px; margin-left: -11px; border-radius: 50%;
+  background: var(--space); border: 3px solid #ffffff38; z-index: 1; transition: background .4s, border-color .4s, box-shadow .4s; }
+.station.is-reached::before { background: radial-gradient(circle at 35% 35%, #ffe2a8, var(--orange)); border-color: #fff; box-shadow: 0 0 0 6px #ffb54726; }
+.station.flip .st-info { order: 2; }
+.station.flip .st-work { order: 1; }
+
+.card-glass { background: var(--glass); border: 1px solid var(--glass-line); border-radius: 26px; padding: 28px;
+  box-shadow: 0 24px 60px #0000004d; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.st-tag { display: inline-block; padding: .3em .8em; border-radius: 999px; background: #3b48dd59; color: #c9d0ff;
+  font-size: .82rem; font-weight: 600; margin-bottom: .9rem; }
+.st-tag.soft { background: #69ddd926; color: var(--cyan); }
+.st-info h2 { font-size: clamp(1.7rem, 3.4vw, 2.5rem); }
+.link-arrow { color: var(--cyan); font-weight: 600; text-decoration: none; border-bottom: 1px solid #69ddd966; }
+.empty-space { color: var(--mist); margin: 0; }
+
+/* слайдер стартов */
+.slider { overflow: hidden; }
+.slider-track { display: flex; transition: transform .5s cubic-bezier(.2,.8,.2,1); }
+.slide { flex: 0 0 100%; padding-right: 4px; }
+.slide h3 { font-size: 1.5rem; margin-bottom: .3em; }
+.slide .meta { color: var(--mist); font-size: .92rem; }
+.age { display: inline-block; padding: 0 .35em; border: 1px solid currentColor; border-radius: 4px; font-size: .8em; }
+.slider-nav { display: flex; align-items: center; justify-content: flex-end; gap: .6rem; margin-top: 1.2rem; }
+.round { width: 44px; height: 44px; border-radius: 50%; border: 1px solid #ffffff2e; background: #ffffff10; color: var(--star);
+  font-size: 1.4rem; cursor: pointer; line-height: 1; }
+.round:hover { background: #ffffff20; }
+.slider-count { color: var(--mist); font-size: .9rem; min-width: 3.5em; text-align: center; }
+
+/* инфографика проверки */
+.infographic { display: grid; grid-template-columns: 170px 1fr; gap: 18px 24px; align-items: center; }
+.donut { width: 170px; height: 170px; }
+.donut circle { transition: stroke-width .2s; }
+.donut-num { font-family: var(--display); font-weight: 700; font-size: 40px; fill: var(--star); }
+.donut-cap { font-size: 14px; fill: var(--mist); }
+.legend { list-style: none; margin: 0; padding: 0; display: grid; gap: .45rem; }
+.legend li { display: grid; grid-template-columns: 12px 1fr auto; gap: .6rem; align-items: center; font-size: .95rem; }
+.legend i { width: 12px; height: 12px; border-radius: 50%; }
+.legend b { font-family: var(--display); font-weight: 600; }
+.flightplan { grid-column: 1 / -1; list-style: none; counter-reset: fp; margin: 6px 0 0; padding: 0; display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; position: relative; }
+.flightplan::before { content: ""; position: absolute; top: 15px; left: 10%; right: 10%; border-top: 2px dashed #ffffff2e; }
+.flightplan li { counter-increment: fp; position: relative; text-align: center; font-size: .82rem; }
+.flightplan li::before { content: counter(fp); display: grid; place-items: center; width: 32px; height: 32px; margin: 0 auto .45rem;
+  border-radius: 50%; background: var(--night); border: 2px solid var(--cyan); color: var(--cyan); font-weight: 600; position: relative; }
+.flightplan li:last-child::before { border-color: var(--orange); color: var(--orange); }
+.flightplan b { display: block; font-weight: 600; }
+.flightplan span { color: var(--mist); }
+
+/* форма-сигнал */
+.signal-form textarea { min-height: 8em; }
+.signal-form input, .signal-form select, .signal-form textarea { border-radius: 14px; background: #0f1638b3; }
+
+/* бортовой журнал */
+.logbook { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 1.2rem 0 0; }
+.logbook div { border-radius: 16px; background: #ffffff0d; padding: 12px 14px; }
+.logbook dd { margin: 0; font-family: var(--display); font-weight: 700; font-size: 1.7rem; order: -1; }
+.logbook div { display: flex; flex-direction: column; }
+.logbook dt { color: var(--mist); font-size: .82rem; }
+.flights { list-style: none; margin: 0; padding: 0; display: grid; gap: 18px; }
+.fl-head { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; }
+.fl-head a { font-weight: 600; text-decoration: none; }
+.fl-head span, .fl-meta span { color: var(--mist); font-size: .85rem; }
+.fl-bar { height: 10px; border-radius: 10px; background: #ffffff14; margin: .45rem 0 .35rem; overflow: hidden; }
+.fl-bar span { display: block; height: 100%; border-radius: 10px; background: linear-gradient(90deg, var(--cyan), var(--orange)); }
+.fl-meta { display: flex; justify-content: space-between; gap: 1rem; }
+.fl-meta b { color: var(--orange); font-weight: 600; white-space: nowrap; }
+
+/* экипаж */
+.crew { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.crew li { display: grid; grid-template-columns: 52px 1fr; gap: 16px; align-items: center; padding: 16px 20px; border-radius: 20px; }
+.crew h3 { margin: 0 0 .15em; font-size: 1rem; }
+.crew p { margin: 0; color: var(--mist); font-size: .92rem; }
+.crew-badge { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffffffcc, var(--c) 58%); box-shadow: 0 0 0 4px #ffffff10; }
+.crew-badge svg { width: 26px; height: 26px; fill: none; stroke: #1b1640; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.formats { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: 1rem; }
+.formats span { padding: .3em .75em; border-radius: 999px; border: 1px solid var(--glass-line); font-size: .85rem; color: var(--mist); }
+
+/* финал маршрута: ракета садится на планету */
+.route-end { position: relative; display: grid; grid-template-columns: auto 1fr; gap: 28px; align-items: center; max-width: 760px;
+  margin: 0 auto; padding: 32px; border-radius: 30px; border: 1px solid var(--glass-line);
+  background: radial-gradient(circle at 12% 50%, #69ddd926, transparent 45%), var(--glass); z-index: 1; }
+.route-end h2 { font-size: clamp(1.6rem, 3.2vw, 2.3rem); }
+.route-end .actions { display: flex; gap: .7rem; flex-wrap: wrap; }
+.planet-badge.big { width: 120px; height: 120px; box-shadow: inset 0 0 0 3px #ffffff70, 0 0 60px #69ddd966; }
+.planet-badge.big::after { inset: 44px -22px; border-width: 7px; }
+
+/* обложка в слайдере */
+.slide-cover { display: block; width: 100%; aspect-ratio: 16 / 7; object-fit: cover; border-radius: 16px; margin-bottom: 1rem; }
+
+/* календарь «Какие события будут» */
+.calendar { list-style: none; margin: 0; padding: 0; display: grid; gap: 18px; }
+.cal-month { font-size: 1.05rem; text-transform: none; margin: 0 0 .5rem; }
+.cal-month span { color: var(--mist); font-weight: 500; }
+.calendar ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.cal-item { display: grid; grid-template-columns: 54px 1fr auto; gap: 14px; align-items: center; padding: 10px 12px; border-radius: 16px; background: #ffffff0a; }
+.cal-day { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 14px; background: #3b48dd59; line-height: 1; }
+.cal-day b { font-family: var(--display); font-size: 1.35rem; }
+.cal-day small { color: #c9d0ff; font-size: .75rem; }
+.cal-what { display: grid; }
+.cal-what a { font-weight: 600; text-decoration: none; }
+.cal-what small { color: var(--mist); font-size: .85rem; }
+.cal-state { font-size: .8rem; padding: .25em .7em; border-radius: 999px; border: 1px solid #ffffff2e; color: var(--mist); white-space: nowrap; }
+.cal-state.on { border-color: #4fd1a199; color: var(--aurora); }
+
+/* заявка */
+.mini-steps { margin: 1.2rem 0 0; padding: 0; list-style: none; counter-reset: ms; display: grid; gap: 10px; }
+.mini-steps li { counter-increment: ms; display: grid; grid-template-columns: 30px 1fr; gap: 10px; align-items: center; color: var(--mist); }
+.mini-steps li::before { content: counter(ms); display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%;
+  border: 2px solid var(--cyan); color: var(--cyan); font-weight: 600; font-size: .85rem; }
+.mini-steps li:last-child::before { border-color: var(--orange); color: var(--orange); }
+.request-form input, .request-form select, .request-form textarea, .signal-form input { border-radius: 14px; background: #0f1638b3; }
+.request-form textarea { min-height: 6.5em; }
+.consent { display: flex; gap: .6rem; align-items: flex-start; color: var(--mist); font-size: .9rem; margin: .2rem 0 1.2rem; }
+.consent input { margin-top: .25em; }
+.hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
+/* стоимость */
+.formula { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 1.2rem 0; }
+.f-part { padding: .45em .8em; border-radius: 12px; font-weight: 600; font-size: .9rem; color: #1b1640; }
+.f-part.c1 { background: var(--cyan); } .f-part.c2 { background: var(--orange); }
+.f-part.c3 { background: #7b88ff; } .f-part.c4 { background: #4fd1a1; }
+.f-op { color: var(--mist); font-weight: 600; }
+.calc { display: grid; gap: 22px; }
+.calc-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+.calc-inputs .field:first-child { grid-column: 1 / -1; }
+.calc-inputs select { border-radius: 14px; background: #0f1638b3; }
+.calc input[type=range] { padding: 0; accent-color: var(--orange); background: none; border: 0; }
+.calc-opts { grid-column: 1 / -1; border: 0; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr; gap: 8px; }
+.calc-opts legend { color: var(--mist); font-size: .9rem; margin-bottom: .4rem; }
+.calc-opts label { display: flex; gap: .5rem; align-items: center; color: var(--star); font-size: .95rem; margin: 0; }
+.calc-opts label .muted { margin-left: auto; font-size: .85rem; white-space: nowrap; }
+.calc-result { border-top: 1px solid var(--glass-line); padding-top: 18px; }
+.calc-total { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin: 0 0 12px; }
+.calc-total span { font-family: var(--display); font-weight: 700; font-size: clamp(2rem, 4vw, 2.6rem); color: var(--orange); }
+.calc-total small { color: var(--mist); }
+.calc-bar { display: flex; height: 16px; border-radius: 10px; overflow: hidden; background: #ffffff14; margin-bottom: 12px; }
+.calc-bar span { display: block; height: 100%; transition: width .4s cubic-bezier(.2,.8,.2,1); }
+.calc-lines { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 6px; }
+.calc-lines li { display: grid; grid-template-columns: 12px 1fr auto; gap: 10px; align-items: center; font-size: .95rem; }
+.calc-lines li i { width: 12px; height: 12px; border-radius: 4px; }
+
+/* фотоальбом */
+.album { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.album-card { position: relative; display: block; border-radius: 22px; overflow: hidden; text-decoration: none; aspect-ratio: 4 / 3;
+  border: 1px solid var(--glass-line); box-shadow: 0 18px 40px #0000004d; background: var(--space); }
+.album-card img, .album-ph { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform .6s cubic-bezier(.2,.8,.2,1); }
+.album-ph { background: radial-gradient(circle at 70% 30%, #69ddd955, transparent 50%), linear-gradient(135deg, #3b48dd, #0f1638); }
+.album-card:hover img, .album-card:focus-visible img { transform: scale(1.05); }
+.album-meta { position: absolute; inset: auto 0 0; padding: 40px 14px 12px; display: grid; gap: 2px;
+  background: linear-gradient(transparent, #0f1638ee 55%); }
+.album-meta b { font-size: 1rem; }
+.album-meta small { color: var(--mist); font-size: .8rem; }
+.album-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.album-tags span { font-size: .75rem; padding: .15em .55em; border-radius: 999px; background: #ffffff1a; }
+.album-tags .star { color: var(--orange); }
+
+.lab-logo { display: block; width: 100%; height: auto; margin-top: 1rem; border-radius: 18px; background: #fff; }
+
+/* ---------- движение: один «взлёт» + ракета по скроллу ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .planet-stage { animation: approach 1.6s cubic-bezier(.2,.8,.2,1) both; }
+  .planet-label { animation: label-in 1s .9s cubic-bezier(.2,.8,.2,1) both; }
+  .orbit-dots { animation: dots 30s linear infinite; }
+  .route-rocket .flame { animation: flicker .18s ease-in-out infinite alternate; }
+  .station .card-glass { transition: transform .6s cubic-bezier(.2,.8,.2,1), opacity .6s; }
+  .js .station:not(.is-reached) .card-glass { opacity: .35; transform: translateY(24px); }
+}
+@keyframes approach { from { transform: scale(.55) translateY(60px); opacity: 0; filter: blur(6px); } to { transform: none; opacity: 1; filter: none; } }
+@keyframes label-in { from { opacity: 0; transform: translate(-42%, -30%) rotate(-12deg) scale(.8); } }
+@keyframes dots { to { stroke-dashoffset: -540; } }
+@keyframes flicker { from { transform: scaleY(.8); } to { transform: scaleY(1.15); } }
+
+/* ---------- адаптив ---------- */
+@media (max-width: 900px) {
+  .hero-journey { grid-template-columns: 1fr; min-height: 0; padding-block: 16px 48px; }
+  .planet-stage { order: -1; width: min(86%, 380px); }
+  .hero-title { max-width: none; }
+  .route-line { left: 14px; }
+  .route-rocket { left: 14px; width: 26px; height: 47px; }
+  .station, .station.flip { grid-template-columns: 1fr; gap: 16px; padding-left: 40px; margin-bottom: 56px; }
+  .station::before { left: 14px; top: 28px; }
+  .station.flip .st-info, .station.flip .st-work { order: initial; }
+  .card-glass { padding: 22px; border-radius: 22px; }
+  .route-end { grid-template-columns: 1fr; margin-left: 40px; padding: 24px; }
+  .planet-badge.big { width: 84px; height: 84px; }
+  .planet-badge.big::after { inset: 30px -15px; border-width: 5px; }
+}
+@media (max-width: 520px) {
+  .infographic { grid-template-columns: 1fr; justify-items: center; }
+  .legend { width: 100%; }
+  .flightplan { grid-template-columns: 1fr; text-align: left; }
+  .flightplan::before { display: none; }
+  .flightplan li { display: grid; grid-template-columns: 32px 1fr; gap: 0 .7rem; text-align: left; }
+  .flightplan li::before { margin: 0; grid-row: span 2; }
+  .logbook dd { font-size: 1.35rem; }
+  .album { grid-template-columns: 1fr; }
+  .calc-inputs, .calc-opts { grid-template-columns: 1fr; }
+  .cal-item { grid-template-columns: 48px 1fr; }
+  .cal-day { width: 48px; height: 48px; }
+  .cal-state { grid-column: 2; justify-self: start; }
+  .hero-countdown { border-radius: 22px; }
+}
+@media (prefers-reduced-motion: reduce) { .satellite { display: none; } }
+.route-end.is-landed { border-color: #ffb5477a; box-shadow: 0 0 0 6px #ffb54714, 0 24px 60px #0000004d; transition: box-shadow .6s, border-color .6s; }
+.station, .route-end, #route { scroll-margin-top: 110px; }
+.album-wide { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+
+/* ---------- команда: слайдер фотографий ---------- */
+.team-slider { overflow: hidden; border-radius: 26px; background: var(--glass); border: 1px solid var(--glass-line); box-shadow: 0 24px 60px #0000004d; }
+.team-card { margin: 0; padding: 0; }
+.team-photo { position: relative; aspect-ratio: 4 / 5; max-height: 520px; width: 100%; overflow: hidden;
+  background: radial-gradient(circle at 70% 25%, #69ddd944, transparent 55%), linear-gradient(160deg, #3b48dd, #18214d 70%); }
+.team-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.team-initials { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--display); font-weight: 700;
+  font-size: clamp(4rem, 10vw, 7rem); color: #f4f2ffcc; }
+.team-dept { position: absolute; left: 16px; top: 16px; display: inline-flex; align-items: center; gap: .45rem; padding: .35em .8em .35em .45em;
+  border-radius: 999px; background: #0f1638cc; backdrop-filter: blur(8px); font-size: .85rem; font-weight: 600; }
+.team-dept svg { width: 22px; height: 22px; padding: 3px; border-radius: 50%; background: var(--c); fill: none; stroke: #1b1640; stroke-width: 2.2;
+  stroke-linecap: round; stroke-linejoin: round; }
+.team-card figcaption { padding: 18px 22px 6px; display: grid; gap: 2px; }
+.team-card figcaption b { font-family: var(--display); font-size: 1.35rem; font-weight: 600; }
+.team-role { color: var(--orange); font-weight: 600; }
+.team-card figcaption p { color: var(--mist); margin: .4rem 0 0; }
+.team-nav { padding: 6px 22px 20px; justify-content: space-between; }
+.team-dots { display: flex; gap: 8px; flex-wrap: wrap; margin-right: auto; }
+.team-dot { width: 40px; height: 40px; border-radius: 50%; overflow: hidden; padding: 0; cursor: pointer; border: 2px solid #ffffff2e;
+  background: #3b48dd; color: var(--star); font-weight: 600; }
+.team-dot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.team-dot[aria-current=true] { border-color: var(--orange); box-shadow: 0 0 0 3px #ffb54733; }
+.dept-chips { list-style: none; margin: 1rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.dept-chips li { display: inline-flex; align-items: center; gap: .45rem; padding: .3em .75em .3em .35em; border-radius: 999px;
+  border: 1px solid var(--glass-line); font-size: .85rem; }
+.dept-chips svg { width: 22px; height: 22px; padding: 3px; border-radius: 50%; background: var(--c); fill: none; stroke: #1b1640; stroke-width: 2.2;
+  stroke-linecap: round; stroke-linejoin: round; }
+@media (max-width: 900px) { .team-photo { aspect-ratio: 1 / 1; } }
+.station > * { min-width: 0; }

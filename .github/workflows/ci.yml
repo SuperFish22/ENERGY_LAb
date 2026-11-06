@@ -1,0 +1,37 @@
+# Проверка каждого push и pull request: линтер, тесты с покрытием, сборка образа
+name: CI
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: {POSTGRES_DB: lab_test, POSTGRES_USER: lab, POSTGRES_PASSWORD: lab}
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U lab" --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12", cache: pip}
+      - run: pip install -r requirements-dev.txt
+      - name: Линтер
+        run: ruff check app tests
+      - name: Тесты (SQLite) и покрытие расчётного модуля не ниже 90 %
+        run: pytest -q --cov=app/expertise --cov-fail-under=90
+      - name: Миграции на PostgreSQL
+        env: {DATABASE_URL: "postgresql+psycopg://lab:lab@localhost:5432/lab_test"}
+        run: alembic upgrade head && python -m app.seed --demo
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Сборка образа без публикации
+        uses: docker/build-push-action@v6
+        with: {context: ., push: false, tags: "energy-lab:ci"}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Доска вопросов — Energy Lab{% endblock %}
+{% block body %}
+{% set active = 'board' %}{% include "partials/public_top.html" %}
+<main class="wrap cols-2" style="padding:24px 24px 64px">
+  <section>
+    <h1>Доска вопросов</h1>
+    {% for q in questions %}
+      <article class="msg"><div class="who">{{ q.category }} · {{ q.created_at|ru_date }}</div><p style="margin:.2rem 0">{{ q.text }}</p>
+      {% if q.answer %}<p class="muted">Ответ: {{ q.answer }}</p>{% endif %}</article>
+    {% else %}<p class="empty">Вопросов пока нет. Задайте первый.</p>{% endfor %}
+  </section>
+  <aside class="panel">
+    <h2>Задать вопрос</h2>
+    {% include "partials/flash.html" %}
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="field"><label for="cat">Тема</label><select id="cat" name="category"><option>Мероприятия</option><option>Режим дня</option><option>Energy Lab</option><option>Другое</option></select></div>
+      <div class="field"><label for="txt">Вопрос</label><textarea id="txt" name="text" required minlength="3" maxlength="1000"></textarea></div>
+      <div class="field"><label for="nm">Имя (необязательно)</label><input id="nm" name="name" maxlength="150"></div>
+      <button class="btn btn-launch">Отправить на проверку</button>
+      <p class="small muted" style="margin-top:1rem">Срочная помощь — кнопка SOS в боте ENERGY или 112.</p>
+    </form>
+  </aside>
+</main>
+{% endblock %}

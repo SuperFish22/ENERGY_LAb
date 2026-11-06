@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+{% block title %}Energy Lab — тусовки, квесты и квизы в Москве{% endblock %}
+{% block description %}Energy Lab — творческая лаборатория педагогического отряда ENERGY: билеты на квизы, квесты и вечеринки, а также тусовки под ключ на день рождения, выпускной и корпоратив.{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/css/home.css">{% endblock %}
+{% block body %}
+{% set active = 'home' %}{% include "partials/public_top.html" %}
+{% set roles = {
+  'SC': 'Придумывают легенду, сюжет и тексты станций',
+  'DIR': 'Ставят программу, держат темп и вовлекают гостей',
+  'TECH': 'Свет, звук, реквизит и безопасность',
+  'PROD': 'Площадка, бюджет, партнёры и сроки',
+  'SMI': 'Анонсы, фото, видео и ваш альбом после праздника'} %}
+{% set icons = {
+  'SC': '<path d="M5 19c3-1 5-3 7-6l6-8-2 7c-1 4-4 6-8 7z"/><path d="M5 19l4-4"/>',
+  'DIR': '<rect x="3" y="9" width="18" height="11" rx="2"/><path d="m3 9 3-5h4l-3 5m6 0 3-5h4l-3 5"/>',
+  'TECH': '<path d="M13 3 6 13h5l-1 8 8-11h-5z"/>',
+  'PROD': '<circle cx="12" cy="12" r="8"/><path d="M12 7v10M9.5 9.5h4a1.8 1.8 0 0 1 0 3.5h-3a1.8 1.8 0 0 0 0 3.5h4"/>',
+  'SMI': '<rect x="3" y="7" width="18" height="13" rx="3"/><circle cx="12" cy="13.5" r="3.5"/><path d="M8 7l1.5-3h5L16 7"/>'} %}
+{% set dept_colors = ['#69ddd9', '#ffb547', '#e5483b', '#7b88ff', '#4fd1a1'] %}
+{% set dept_color = {'SC': '#69ddd9', 'DIR': '#ffb547', 'PROD': '#e5483b', 'TECH': '#7b88ff', 'SMI': '#4fd1a1'} %}
+{% set month_names = ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'] %}
+<main>
+  <!-- ============ ГЕРОЙ ============ -->
+  <section class="wrap hero-journey">
+    <div class="hero-copy">
+      <p class="eyebrow">{{ texts.eyebrow }}</p>
+      <h1 class="hero-title">Мы в&nbsp;<span class="c-cyan">космосе</span> и&nbsp;летим к&nbsp;<span class="c-orange">планете идей</span></h1>
+      <p class="lead">{{ texts.lead }}</p>
+      <div class="actions">
+        <a class="btn btn-flame" href="#events">Выбрать мероприятие</a>
+        <a class="btn btn-glass" href="#request">Заказать тусовку</a>
+      </div>
+    </div>
+
+    <div class="planet-stage" aria-hidden="true">
+      <svg class="planet" viewBox="0 0 520 460">
+        <defs>
+          <radialGradient id="pl-body" cx="38%" cy="34%" r="70%">
+            <stop offset="0" stop-color="#d7fff0"/><stop offset=".32" stop-color="#69ddd9"/>
+            <stop offset=".66" stop-color="#5b8cff"/><stop offset="1" stop-color="#3b48dd"/>
+          </radialGradient>
+          <clipPath id="pl-clip"><circle cx="260" cy="240" r="150"/></clipPath>
+          <radialGradient id="pl-glow" cx="50%" cy="50%" r="50%">
+            <stop offset=".55" stop-color="#69ddd9" stop-opacity=".35"/><stop offset="1" stop-color="#69ddd9" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <circle cx="260" cy="240" r="215" fill="url(#pl-glow)"/>
+        <path d="M70 270 A200 62 -14 0 1 452 176" fill="none" stroke="#ffb547" stroke-width="12" stroke-linecap="round" opacity=".55"/>
+        <circle cx="260" cy="240" r="150" fill="url(#pl-body)"/>
+        <g clip-path="url(#pl-clip)" stroke="#3b48dd" stroke-opacity=".38" stroke-width="2" fill="none">
+          <ellipse cx="260" cy="240" rx="150" ry="44"/><ellipse cx="260" cy="240" rx="150" ry="96"/>
+          <line x1="110" y1="240" x2="410" y2="240"/>
+          <ellipse cx="260" cy="240" rx="44" ry="150"/><ellipse cx="260" cy="240" rx="96" ry="150"/>
+          <line x1="260" y1="90" x2="260" y2="390"/>
+        </g>
+        <circle cx="210" cy="190" r="48" fill="#fff" opacity=".18"/>
+        <path d="M452 176 A200 62 -14 0 1 70 270" fill="none" stroke="#ffb547" stroke-width="12" stroke-linecap="round"/>
+        <path d="M60 226 A212 70 -14 0 1 470 140" fill="none" stroke="#69ddd9" stroke-width="5" stroke-linecap="round" stroke-dasharray="2 16" class="orbit-dots"/>
+        <g class="satellite"><circle r="9" fill="#f4f2ff"/><circle r="4" fill="#e5483b"/>
+          <animateMotion dur="14s" repeatCount="indefinite" path="M60 226 A212 70 -14 0 1 470 140"/></g>
+      </svg>
+      <div class="planet-label"><span>ENERGY</span><span>LAB</span></div>
+    </div>
+
+    {% if next_launch %}{% set left = next_launch.planned_date|days_left %}
+    <a class="hero-countdown" href="/e/{{ next_launch.code }}" aria-label="Ближайшее мероприятие: {{ next_launch.title }}">
+      <span class="t-minus">Т−{{ left if left is not none and left >= 0 else 0 }}</span>
+      <span class="hc-body"><b>{{ next_launch.title }}</b><span>{{ next_launch.planned_date|date_long }}{% if next_launch.start_time %}, {{ next_launch.start_time }}{% endif %} · {{ next_launch.ticket_price|money }} · {{ next_launch.age_rating }}</span></span>
+    </a>
+    {% endif %}
+  </section>
+
+  <section class="route wrap" id="route" aria-label="Energy Lab по станциям">
+    <div class="route-line" aria-hidden="true"><div class="route-fill"></div>
+      <svg class="route-rocket" viewBox="0 0 40 72"><path d="M20 2C32 14 33 36 29 52H11C7 36 8 14 20 2z" fill="#f4f2ff"/><path d="M20 2c5 5 8 11 9 17H11c1-6 4-12 9-17z" fill="#e5483b"/><circle cx="20" cy="30" r="6" fill="#69ddd9" stroke="#3b48dd" stroke-width="2"/><path d="M11 40 3 54l9-3zM29 40l8 14-9-3z" fill="#e5483b"/><path class="flame" d="M14 53q6 22 12 0z" fill="#ffb547"/></svg>
+    </div>
+
+    <!-- 01 Мероприятия -->
+    <article class="station" id="events">
+      <div class="st-info card-glass">
+        <span class="st-tag">Станция 01</span>
+        <h2>Мероприятия</h2>
+        <p class="muted">На эти мероприятия уже продаются билеты. Оплата картой или СБП через Timepad, чек придёт на почту.</p>
+        <a class="link-arrow" href="/afisha">Вся афиша</a>
+      </div>
+      <div class="st-work card-glass">
+        {% if upcoming %}
+        <div class="slider" data-slider>
+          <div class="slider-track">
+          {% for ev in upcoming %}{% set l = ev.planned_date|days_left %}
+            <div class="slide" role="group" aria-roledescription="слайд" aria-label="{{ loop.index }} из {{ upcoming|length }}">
+              {% if ev.cover %}<img class="slide-cover" src="/media/{{ ev.cover.file }}" alt="" loading="lazy">{% endif %}
+              <span class="st-tag soft">{% if loop.first %}Ближайшее{% else %}Скоро{% endif %} · Т−{{ l if l is not none and l >= 0 else 0 }}</span>
+              <h3>{{ ev.title }}</h3>
+              <p class="meta">{{ ev.planned_date|date_long }}{% if ev.start_time %}, {{ ev.start_time }}{% endif %}{% if ev.venue %} · {{ ev.venue.name }}{% endif %} · <span class="age">{{ ev.age_rating }}</span></p>
+              <p>{{ (ev.description or ev.format.name)|truncate(170) }}</p>
+              <a class="btn btn-flame btn-small" href="/e/{{ ev.code }}">Купить билет · {{ ev.ticket_price|money }}</a>
+            </div>
+          {% endfor %}
+          </div>
+          {% if upcoming|length > 1 %}<div class="slider-nav"><button type="button" class="round" data-prev aria-label="Предыдущее мероприятие">‹</button><span class="slider-count" data-count>1 / {{ upcoming|length }}</span><button type="button" class="round" data-next aria-label="Следующее мероприятие">›</button></div>{% endif %}
+        </div>
+        {% else %}
+        <p class="empty-space">Сейчас билеты не продаются — новые мероприятия готовятся. Загляните в блок «Какие события будут» или закажите свою тусовку.</p>
+        {% endif %}
+      </div>
+    </article>
+
+    <!-- 02 Какие события будут -->
+    <article class="station flip" id="soon">
+      <div class="st-info card-glass">
+        <span class="st-tag">Станция 02</span>
+        <h2>Какие события будут</h2>
+        <p class="muted">Календарь ближайших месяцев. Если продажи ещё не открыты, событие уже утверждено и готовится — следите за анонсами <a href="{{ texts.vk_url }}" rel="noopener">во ВКонтакте</a>.</p>
+      </div>
+      <div class="st-work card-glass">
+        {% if months %}
+        <ol class="calendar">
+          {% for key, evs in months.items() %}{% set mm = key.split('-') %}
+          <li><h3 class="cal-month">{{ month_names[mm[1]|int - 1] }} <span>{{ mm[0] }}</span></h3>
+            <ul>{% for ev in evs %}
+              <li class="cal-item"><span class="cal-day"><b>{{ ev.planned_date.day }}</b><small>{{ ['пн','вт','ср','чт','пт','сб','вс'][ev.planned_date.weekday()] }}</small></span>
+                <span class="cal-what">{% if ev.status == 'on_sale' %}<a href="/e/{{ ev.code }}">{{ ev.title }}</a>{% else %}{{ ev.title }}{% endif %}<small>{{ ev.format.name }} · {{ ev.age_rating }}</small></span>
+                {% if ev.status == 'on_sale' %}<span class="cal-state on">билеты есть</span>{% else %}<span class="cal-state">скоро продажи</span>{% endif %}</li>
+            {% endfor %}</ul></li>
+          {% endfor %}
+        </ol>
+        {% else %}<p class="empty-space">Календарь на ближайшие месяцы формируется. Новые события появятся здесь, как только руководители их утвердят.</p>{% endif %}
+      </div>
+    </article>
+
+    <!-- 03 Заявка на тусовку -->
+    <article class="station" id="request">
+      <div class="st-info card-glass">
+        <span class="st-tag">Станция 03</span>
+        <h2>Заявка на&nbsp;создание тусовки</h2>
+        <p class="muted">{{ texts.request_intro }}</p>
+        <ol class="mini-steps">
+          <li>Вы оставляете заявку</li><li>Продюсер уточняет детали и бюджет</li><li>Команда собирает сценарий и смету</li><li>Тусовка и фотоальбом</li>
+        </ol>
+      </div>
+      <form class="st-work card-glass request-form" method="post" action="/request" novalidate>
+        {% include "partials/flash.html" %}
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="hp" aria-hidden="true"><label for="rq-web">Сайт</label><input id="rq-web" name="website" tabindex="-1" autocomplete="off"></div>
+        <div class="grid-2">
+          <div class="field"><label for="rq-name">Как к вам обращаться</label><input id="rq-name" name="name" required maxlength="150" autocomplete="name" value="{{ rf.name or '' }}"></div>
+          <div class="field"><label for="rq-contact">Телефон, e-mail или ник в Telegram/VK</label><input id="rq-contact" name="contact" required maxlength="150" autocomplete="tel" value="{{ rf.contact or '' }}"></div>
+          <div class="field"><label for="rq-occ">Повод</label><select id="rq-occ" name="occasion">{% for o in occasions %}<option {% if rf.occasion == o %}selected{% endif %}>{{ o }}</option>{% endfor %}</select></div>
+          <div class="field"><label for="rq-fmt">Формат</label><select id="rq-fmt" name="format_id"><option value="">Подскажите, что лучше</option>{% for f in formats %}<option value="{{ f.id }}" data-group="{{ f.group_name }}" {% if rf.format_id == f.id|string %}selected{% endif %}>{{ f.name }}</option>{% endfor %}</select></div>
+          <div class="field"><label for="rq-date">Желаемая дата</label><input id="rq-date" name="wish_date" type="date" value="{{ rf.wish_date or '' }}"></div>
+          <div class="field"><label for="rq-guests">Сколько гостей</label><input id="rq-guests" name="guests" type="number" min="1" max="1000" required value="{{ rf.guests or 20 }}"></div>
+          <div class="field"><label for="rq-age">Возраст гостей</label><select id="rq-age" name="age_group"><option value="">—</option>{% for a in age_groups %}<option {% if rf.age_group == a %}selected{% endif %}>{{ a }}</option>{% endfor %}</select></div>
+          <div class="field"><label for="rq-budget">Бюджет, ₽ (если знаете)</label><input id="rq-budget" name="budget" inputmode="numeric" value="{{ rf.budget or '' }}"></div>
+        </div>
+        <div class="field"><label for="rq-msg">Расскажите об идее</label><textarea id="rq-msg" name="message" maxlength="2000" placeholder="Например: день рождения сына, 14 лет, любит фантастику; хотим квест на 2–3 часа">{{ rf.message or '' }}</textarea></div>
+        <label class="consent"><input type="checkbox" name="consent" value="1" required><span>Согласен на обработку персональных данных для ответа на заявку по <a href="/privacy">политике конфиденциальности</a></span></label>
+        <button class="btn btn-flame">Отправить заявку</button>
+      </form>
+    </article>
+
+    <!-- 04 Как рассчитывается стоимость -->
+    <article class="station flip" id="price">
+      <div class="st-info card-glass">
+        <span class="st-tag">Станция 04</span>
+        <h2>Как рассчитывается стоимость</h2>
+        <p class="muted">Цена складывается из четырёх частей. Реквизит и материалы на гостя мы считаем по нашим прошедшим мероприятиям того же формата, поэтому цифра опирается на опыт, а не берётся «с потолка».</p>
+        <div class="formula" aria-label="Формула стоимости">
+          <span class="f-part c1">Материалы × гости</span><span class="f-op">+</span><span class="f-part c2">Команда × часы</span><span class="f-op">+</span><span class="f-part c3">Доп. услуги</span><span class="f-op">+</span><span class="f-part c4">{{ (pricing.margin*100)|round|int }}% на развитие Lab</span>
+        </div>
+        <p class="small muted">В расчёте минимум {{ pricing.min_guests }} гостей. Ведущие и актёры — {{ pricing.team_per_hour|money }} за час программы. Это предварительная оценка: точную смету пришлёт продюсер после разговора с вами.</p>
+      </div>
+      <div class="st-work card-glass calc" data-calc='{{ {"rates": rates, "team": pricing.team_per_hour, "minGuests": pricing.min_guests, "margin": pricing.margin, "options": pricing.options}|tojson }}'>
+        <div class="calc-inputs">
+          <div class="field"><label for="c-group">Формат</label><select id="c-group">{% for g in groups %}<option {% if g == 'Квестовые' %}selected{% endif %}>{{ g }}</option>{% endfor %}</select>
+            <span class="small muted" data-source></span></div>
+          <div class="field"><label for="c-guests">Гостей: <b data-out="guests">20</b></label><input id="c-guests" type="range" min="5" max="150" step="1" value="20"></div>
+          <div class="field"><label for="c-hours">Длительность: <b data-out="hours">{{ pricing.hours_default }}</b> ч</label><input id="c-hours" type="range" min="1" max="6" step="0.5" value="{{ pricing.hours_default }}"></div>
+          <fieldset class="calc-opts"><legend>Дополнительно</legend>
+            {% for key, opt in pricing.options.items() %}<label><input type="checkbox" value="{{ key }}" {% if loop.first %}checked{% endif %}> {{ opt[0] }} <span class="muted">{{ opt[1]|money }}</span></label>{% endfor %}
+          </fieldset>
+        </div>
+        <div class="calc-result" aria-live="polite">
+          <p class="calc-total"><span data-total>{{ sample.total|money }}</span><small data-per>≈ {{ sample.per_guest|money }} с гостя</small></p>
+          <div class="calc-bar" data-bar></div>
+          <ul class="calc-lines" data-lines>{% for n, v in sample.lines %}<li><span>{{ n }}</span><b>{{ v|money }}</b></li>{% endfor %}</ul>
+          <a class="btn btn-glass" href="#request" data-to-request>Отправить заявку с этим расчётом</a>
+        </div>
+      </div>
+    </article>
+
+    <!-- 05 Фотоальбом -->
+    <article class="station" id="album">
+      <div class="st-info card-glass">
+        <span class="st-tag">Станция 05</span>
+        <h2>Фотоальбом прошедших тусовок</h2>
+        <p class="muted">Как это было: фото и итоги наших мероприятий. Нажмите на карточку — откроется страница тусовки с альбомом и оценкой гостей.</p>
+        {% if stats.launches %}
+        <dl class="logbook">
+          <div><dt>тусовок проведено</dt><dd>{{ stats.launches }}</dd></div>
+          <div><dt>гостей побывало</dt><dd>{{ stats.guests }}</dd></div>
+          <div><dt>средняя оценка</dt><dd>{{ stats.rating|num(1) if stats.rating else '—' }}</dd></div>
+        </dl>
+        {% endif %}
+        <p style="margin-top:1rem"><a class="link-arrow" href="/archive">Все прошедшие тусовки</a></p>
+      </div>
+      <div class="st-work">
+        {% if past %}
+        <ul class="album">
+          {% for ev in past %}{% set r = ev.result %}
+          <li><a class="album-card" href="/e/{{ ev.code }}">
+            {% if ev.cover %}<img src="/media/{{ ev.cover.file }}" alt="{{ ev.title }}" loading="lazy">{% else %}<span class="album-ph" aria-hidden="true"></span>{% endif %}
+            <span class="album-meta"><b>{{ ev.title }}</b><small>{{ ev.planned_date|ru_date }} · {{ ev.format.name }}</small>
+              <span class="album-tags">{% if r %}<span>{{ r.guests_count }} гостей</span>{% endif %}{% if r and r.avg_rating %}<span class="star">★ {{ r.avg_rating|num(1) }}</span>{% endif %}{% if ev.photos %}<span>{{ ev.photos|length }} фото</span>{% endif %}</span></span>
+          </a></li>
+          {% endfor %}
+        </ul>
+        {% else %}<p class="empty-space card-glass">Альбом заполнится после первой тусовки.</p>{% endif %}
+      </div>
+    </article>
+
+    <!-- 06 Кто создаёт тусовки -->
+    <article class="station flip" id="crew">
+      <div class="st-info card-glass">
+        <span class="st-tag">Станция 06</span>
+        <h2>Кто создаёт тусовки</h2>
+        <p class="muted">{{ texts.crew_intro }}</p>
+        <ul class="dept-chips" aria-label="Отделы Energy Lab">{% for d in departments %}<li style="--c: {{ dept_color.get(d.code, '#69ddd9') }}" title="{{ roles.get(d.code, '') }}"><svg viewBox="0 0 24 24" aria-hidden="true">{{ icons.get(d.code, '')|safe }}</svg>{{ d.name }}</li>{% endfor %}</ul>
+        <img class="lab-logo" src="/static/img/energy-lab-logo.jpg" alt="Логотип Energy Lab" width="640" height="360" loading="lazy">
+      </div>
+      <div class="st-work team">
+        {% if team %}
+        <div class="team-slider" data-slider data-interval="7000">
+          <div class="slider-track">
+          {% for t in team %}
+            <figure class="slide team-card" role="group" aria-roledescription="слайд" aria-label="{{ loop.index }} из {{ team|length }}: {{ t.full_name }}">
+              <div class="team-photo">{% if t.photo %}<img src="/media/{{ t.photo }}" alt="{{ t.full_name }}" loading="lazy">{% else %}<span class="team-initials" aria-hidden="true">{{ t.full_name.split()|map('first')|join('')|upper|truncate(2, True, '') }}</span>{% endif %}
+                {% if t.department %}<span class="team-dept" style="--c: {{ dept_color.get(t.department.code, '#69ddd9') }}"><svg viewBox="0 0 24 24" aria-hidden="true">{{ icons.get(t.department.code, '')|safe }}</svg>{{ t.department.name }}</span>{% endif %}
+              </div>
+              <figcaption><b>{{ t.full_name }}</b><span class="team-role">{{ t.role }}</span>{% if t.bio %}<p>{{ t.bio }}</p>{% endif %}</figcaption>
+            </figure>
+          {% endfor %}
+          </div>
+          {% if team|length > 1 %}
+          <div class="slider-nav team-nav">
+            <div class="team-dots" role="tablist" aria-label="Выбрать человека">{% for t in team %}<button type="button" class="team-dot" data-go="{{ loop.index0 }}" aria-label="{{ t.full_name }}">{% if t.photo %}<img src="/media/{{ t.photo }}" alt="">{% else %}{{ t.full_name[:1] }}{% endif %}</button>{% endfor %}</div>
+            <button type="button" class="round" data-prev aria-label="Предыдущий">‹</button><button type="button" class="round" data-next aria-label="Следующий">›</button>
+          </div>
+          {% endif %}
+        </div>
+        {% else %}
+        <ul class="crew">
+          {% for d in departments %}
+          <li class="card-glass"><span class="crew-badge" style="--c: {{ dept_colors[loop.index0 % 5] }}"><svg viewBox="0 0 24 24" aria-hidden="true">{{ icons.get(d.code, '<circle cx="12" cy="12" r="6"/>')|safe }}</svg></span>
+            <div><h3>{{ d.name }}</h3><p>{{ roles.get(d.code, '') }}</p></div></li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      </div>
+    </article>
+
+    <div class="route-end" id="landing">
+      <span class="planet-badge big" aria-hidden="true"></span>
+      <div>
+        <h2>Конечная — планета идей</h2>
+        <p class="muted">Приходите гостем на ближайшее мероприятие или закажите свою тусовку — мы готовы к запуску.</p>
+        <div class="actions">{% if next_launch %}<a class="btn btn-flame" href="/e/{{ next_launch.code }}">Билет на «{{ next_launch.title }}»</a>{% endif %}<a class="btn btn-glass" href="#request">Заказать тусовку</a></div>
+      </div>
+    </div>
+  </section>
+</main>
+{% include "partials/public_foot.html" %}
+<script src="/static/js/home.js" defer></script>
+{% endblock %}

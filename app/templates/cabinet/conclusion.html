@@ -1,0 +1,12 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Заключение {{ ev.code }}</title>
+<style>body{font:14px/1.5 "Golos Text",Arial,sans-serif;color:#111;max-width:800px;margin:24px auto;padding:0 24px}h1{font-size:22px}table{border-collapse:collapse;width:100%;margin:12px 0}td,th{border:1px solid #999;padding:4px 8px;text-align:left}.r{text-align:right}@media print{button{display:none}}</style></head>
+<body><button onclick="print()">Печать / сохранить в PDF</button>
+<h1>Экспертное заключение по проекту «{{ ev.title }}»</h1>
+<p>Код {{ ev.code }} · {{ ev.format.name }} · дата {{ ev.planned_date|ru_date }} · сформировано {{ fc.created_at|ru_date if fc else '—' }}</p>
+<table><tr><th>Итоговая оценка S</th><td class="r">{{ summ.S|num }}</td></tr><tr><th>Согласованность W</th><td class="r">{{ summ.W|num if summ.W is not none else '—' }}</td></tr>
+<tr><th>Риск провала Q</th><td class="r">{{ summ.Q|num if summ.Q is not none else '—' }}</td></tr><tr><th>Рекомендация</th><td>{{ fc.recommendation if fc else '—' }}</td></tr></table>
+<h2>Оценки отделов</h2><table>{% for n,v in summ.departments.items() %}<tr><td>{{ n }}</td><td class="r">{{ v|num }}</td></tr>{% endfor %}</table>
+<h2>Станции</h2><table><tr><th>Станция</th><th class="r">S</th><th class="r">R</th><th>Зона</th></tr>{% for s in summ.stations %}<tr><td>{{ s.station.title }}</td><td class="r">{{ s.S|num }}</td><td class="r">{{ s.R|num(1) }}</td><td>{{ s.zone_name }}</td></tr>{% endfor %}</table>
+{% if fc %}<h2>Прогноз</h2><table><tr><td>Явка</td><td class="r">{{ fc.attendance or '—' }} ({{ fc.attendance_low or '—' }}–{{ fc.attendance_high or '—' }})</td></tr><tr><td>Выручка</td><td class="r">{{ fc.revenue|money }}</td></tr><tr><td>Бюджет</td><td class="r">{{ fc.budget|money }}</td></tr><tr><td>Оценка гостей</td><td class="r">{{ fc.avg_rating|num }}</td></tr></table>
+{% if fc.reasons %}<ul>{% for r in fc.reasons %}<li>{{ r }}</li>{% endfor %}</ul>{% endif %}{% endif %}
+<p style="margin-top:40px">Руководитель Energy Lab ____________________</p></body></html>

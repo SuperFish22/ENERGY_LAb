@@ -1,0 +1,44 @@
+{% extends "cabinet/_layout.html" %}{% set nav = 'projects' %}
+{% block page_title %}Оценка: {{ ev.title }}{% endblock %}
+{% block main %}
+<header><div><p class="muted" style="margin:0">Экспертиза · тур {{ rnd.round_no }}{% if rnd.round_no > 1 %} (Дельфи){% endif %}{% if rnd.deadline %} · срок {{ rnd.deadline|ru_date }}{% endif %}</p>
+  <h1 style="font-size:1.8rem;margin:.2rem 0">{{ ev.title }}</h1><p class="muted">Отдел: {{ user.expert.department.name }}. Другие эксперты не видят ваших баллов до закрытия тура.</p></div>
+  <a class="btn" href="/cabinet/projects/{{ ev.id }}">К проекту</a></header>
+<nav class="tabs" aria-label="Объект оценки">
+  <a href="?" {% if cur is none %}aria-current="page"{% endif %}>Проект целиком {{ '✓' if done[None] }}</a>
+  {% for st in ev.stations %}<a href="?station={{ st.id }}" {% if cur == st.id %}aria-current="page"{% endif %}>{{ st.order_no }}. {{ st.title }} {{ '✓' if done[st.id] }}</a>{% endfor %}
+</nav>
+<div class="cols-2"><div>
+<form method="post" class="panel" id="ev-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="station_id" value="{{ cur or '' }}">
+  <h2>{{ station.title if station else 'Проект целиком' }}</h2>
+  {% if station and station.description %}<p class="muted">{{ station.description }}</p>{% endif %}
+  {% for c in crits %}{% set e = mine.get((c.id, cur)) %}{% set med = medians.get((c.id, cur)) %}
+  <fieldset class="field" style="border:0;padding:0;margin-bottom:1.25rem">
+    <legend>{{ c.name }} <span class="muted small">· вес {{ c.weight|num }}{% if med %} · медиана тура 1: {{ med[0]|num(1) }}, разброс {{ med[1]|num(1) }}{% endif %}</span></legend>
+    <div class="scale">{% for i in range(1,6) %}<label><input type="radio" name="score_{{ c.id }}" value="{{ i }}" {% if e and e.score == i %}checked{% endif %}><span>{{ i }}</span></label>{% endfor %}</div>
+    <label for="cm{{ c.id }}" class="sr">Комментарий</label>
+    <input id="cm{{ c.id }}" name="comment_{{ c.id }}" value="{{ e.comment if e and e.comment else '' }}" placeholder="Комментарий (обязателен при 1–2 баллах)" style="margin-top:.5rem">
+  </fieldset>{% endfor %}
+  {% if station %}{% set r = risk %}
+  <h2>Риск провала станции</h2>
+  <div class="grid-2">
+    <div class="field"><label for="pp">Вероятность провала</label><select id="pp" name="probability"><option value="">—</option>{% for i, t in [(1,'1 — маловероятно'),(2,'2'),(3,'3 — возможно'),(4,'4'),(5,'5 — почти наверняка')] %}<option value="{{ i }}" {% if r and r.probability == i %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></div>
+    <div class="field"><label for="ii">Последствия</label><select id="ii" name="impact"><option value="">—</option>{% for i, t in [(1,'1 — гости не заметят'),(2,'2'),(3,'3 — станция сорвётся'),(4,'4'),(5,'5 — сорвётся всё мероприятие')] %}<option value="{{ i }}" {% if r and r.impact == i %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></div>
+  </div>
+  <p>Уровень риска: <b id="risk-out">{% if r %}{{ r.probability * r.impact }}{% else %}—{% endif %}</b> <span id="risk-zone" class="muted"></span></p>
+  <div class="field"><label for="rc">Что может пойти не так</label><input id="rc" name="risk_comment" value="{{ r.comment if r and r.comment else '' }}"></div>
+  {% endif %}
+  <div class="row-actions"><button class="btn" name="action" value="draft">Сохранить черновик</button><button class="btn btn-launch" name="action" value="submit">Отправить оценку</button></div>
+</form>
+</div><aside class="panel"><h2>Карточка проекта</h2>
+  <p class="muted small">{{ ev.format.name }} · {{ ev.planned_date|ru_date }} · {{ ev.ticket_price|money }} · {{ ev.capacity or '—' }} мест</p>
+  <p>{{ ev.description or '' }}</p>
+  <ol>{% for st in ev.stations %}<li>{{ st.title }} — {{ st.duration_min }} мин, {{ st.cost|money }}</li>{% endfor %}</ol>
+</aside></div>
+<script>
+(function(){var p=document.getElementById('pp'),i=document.getElementById('ii'),o=document.getElementById('risk-out'),z=document.getElementById('risk-zone');
+ if(!p)return;var g={{ zones[0] }},y={{ zones[1] }};
+ function u(){if(p.value&&i.value){var r=p.value*i.value;o.textContent=r;z.textContent=r<=g?'зелёная зона':(r<=y?'жёлтая зона — нужны меры':'красная зона — станцию надо доработать');z.className=r<=g?'zone-green':(r<=y?'zone-yellow':'zone-red');}}
+ p.addEventListener('change',u);i.addEventListener('change',u);u();})();
+</script>
+{% endblock %}

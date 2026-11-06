@@ -1,0 +1,191 @@
+{
+  "name": "Energy Lab — документ из шаблона Google Docs",
+  "nodes": [
+    {
+      "id": "86eb9256-abef-5508-bb93-bcaf7b7e81b7",
+      "name": "Запуск по коду мероприятия",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "energy-lab-doc",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Energy Lab → n8n"
+        }
+      }
+    },
+    {
+      "id": "9999ebeb-2be0-5a26-b0c4-e44748747837",
+      "name": "API: метки проекта",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        200
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.LAB_URL }}/api/bot/export/events/{{ $json.body.code }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": false
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Energy Lab Bot API"
+        }
+      }
+    },
+    {
+      "id": "5f91a467-829b-5916-aa8d-cf74d785c22a",
+      "name": "Подготовить замены",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        200
+      ],
+      "parameters": {
+        "jsCode": "// Метки {{KEY}} → список действий замены для Google Docs\nconst ph = $json.placeholders || {};\nreturn [{ json: { code: ph.CODE, title: `${ph.CODE} ${ph.TITLE}`,\n  actions: Object.entries(ph).map(([k, v]) => ({ action: 'replaceAll', text: `{{${k}}}`, replaceText: v == null ? '—' : String(v) })) } }];\n"
+      }
+    },
+    {
+      "id": "e32ad16e-d344-52bc-8fd6-4c595d8c7c3a",
+      "name": "Google Диск: копия шаблона",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        660,
+        200
+      ],
+      "parameters": {
+        "operation": "copy",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Запуск по коду мероприятия').first().json.body.template_id || $env.GDOC_TEMPLATE_ID }}"
+        },
+        "name": "={{ $json.title }}",
+        "sameFolder": false,
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GDRIVE_FOLDER_ID }}"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "",
+          "name": "Google сервисный аккаунт"
+        }
+      }
+    },
+    {
+      "id": "8eff9345-2075-5376-9dee-8db4044813bf",
+      "name": "Google Docs: заменить метки",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://docs.googleapis.com/v1/documents/{{ $json.id }}:batchUpdate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ requests: $('Подготовить замены').first().json.actions.map(a => ({ replaceAllText: { containsText: { text: a.text, matchCase: true }, replaceText: a.replaceText } })) }) }}",
+        "options": {}
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "",
+          "name": "Google сервисный аккаунт"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Запуск по коду мероприятия": {
+      "main": [
+        [
+          {
+            "node": "API: метки проекта",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API: метки проекта": {
+      "main": [
+        [
+          {
+            "node": "Подготовить замены",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Подготовить замены": {
+      "main": [
+        [
+          {
+            "node": "Google Диск: копия шаблона",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Диск: копия шаблона": {
+      "main": [
+        [
+          {
+            "node": "Google Docs: заменить метки",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Moscow"
+  },
+  "tags": [
+    {
+      "name": "energy-lab"
+    },
+    {
+      "name": "google"
+    }
+  ],
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "pinData": {}
+}

@@ -1,0 +1,19 @@
+{% extends "cabinet/_layout.html" %}{% set nav = 'profile' %}
+{% block page_title %}Профиль{% endblock %}
+{% block main %}
+<h1 style="font-size:2rem">Профиль и бот</h1>
+<div class="cols-2">
+<form method="post" class="panel"><h2>Данные</h2><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <div class="field"><label for="fn">Имя и фамилия</label><input id="fn" name="full_name" value="{{ user.full_name }}" required></div>
+  <div class="field"><label>E-mail</label><input value="{{ user.email }}" disabled></div>
+  <div class="field"><label for="ph">Телефон (виден руководителям; нужен дежурным для SOS)</label><input id="ph" name="phone" value="{{ user.phone or '' }}" autocomplete="tel"></div>
+  <div class="field"><label for="nc">Куда присылать уведомления</label><select id="nc" name="notify_channel">{% for k,v in [('telegram','Telegram'),('vk','ВКонтакте'),('none','Не присылать')] %}<option value="{{ k }}" {% if user.notify_channel == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></div>
+  <button class="btn btn-launch">Сохранить</button></form>
+<section class="panel"><h2>Бот ENERGY</h2>
+  <p>Telegram: {{ 'привязан' if user.telegram_id else 'не привязан' }} · ВКонтакте: {{ 'привязан' if user.vk_id else 'не привязан' }}</p>
+  <p class="muted">В боте можно смотреть свои задачи, менять их статус и задавать вопросы своему отделу.</p>
+  {% if user.telegram_id or user.vk_id %}<form method="post" action="/cabinet/profile/unlink" class="row-actions"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">{% if user.telegram_id %}<button class="btn ghost" name="channel" value="telegram">Отвязать Telegram</button>{% endif %}{% if user.vk_id %}<button class="btn ghost" name="channel" value="vk">Отвязать ВКонтакте</button>{% endif %}</form>{% endif %}
+  {% if code %}<p>Отправьте боту: <b style="font-family:var(--display);font-size:1.4rem">/link {{ code.code }}</b><br><span class="muted small">Код действует до {{ code.expires_at.strftime('%H:%M') }}</span></p>
+  {% else %}<form method="post" action="/cabinet/profile/link-code"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn">Получить код привязки</button></form>{% endif %}
+</section></div>
+{% endblock %}

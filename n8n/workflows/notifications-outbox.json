@@ -1,0 +1,303 @@
+{
+  "name": "Energy Lab — доставка уведомлений",
+  "nodes": [
+    {
+      "id": "e1dc1c96-55ac-54fe-8711-1fa027368f34",
+      "name": "Каждую минуту",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "2ddb5ff1-6534-5b20-9d69-fd2bc0c47b40",
+      "name": "API: очередь",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        200
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.LAB_URL }}/api/bot/notifications",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": false
+            }
+          }
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "50"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Energy Lab Bot API"
+        }
+      }
+    },
+    {
+      "id": "06b1d6ea-a743-50b0-90c1-a2221c4cdb04",
+      "name": "По одному",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        200
+      ],
+      "parameters": {
+        "jsCode": "return ($json.items || []).map(i => ({ json: i }));"
+      }
+    },
+    {
+      "id": "36dc0292-2d09-58cf-8064-0c885d27a4cf",
+      "name": "Канал",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        660,
+        200
+      ],
+      "parameters": {
+        "mode": "expression",
+        "numberOutputs": 2,
+        "output": "={{ $json.channel === 'vk' ? 1 : 0 }}"
+      }
+    },
+    {
+      "id": "491ff775-055a-5e9e-8c76-8bcd9c713d5e",
+      "name": "Telegram: отправить",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        100
+      ],
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Telegram ENERGY bot"
+        }
+      }
+    },
+    {
+      "id": "b2ba088e-9cc6-57c0-8de2-7900b987b163",
+      "name": "VK: отправить",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.vk.com/method/messages.send",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "user_id",
+              "value": "={{ $json.chat_id }}"
+            },
+            {
+              "name": "random_id",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "name": "message",
+              "value": "={{ $json.text }}"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $env.VK_GROUP_TOKEN }}"
+            },
+            {
+              "name": "v",
+              "value": "5.199"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "22683f9a-1358-5d88-8546-f59393b33bbb",
+      "name": "Вернуть id",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        200
+      ],
+      "parameters": {
+        "jsCode": "// id уведомления берём из исходного элемента очереди (связь элементов n8n)\nreturn $input.all().map((x, i) => ({ json: { id: $('По одному').itemMatching(i).json.id } }));",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "370d61ee-6465-5efa-87e1-e651cc6c1cd4",
+      "name": "API: отметить отправленным",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LAB_URL }}/api/bot/notifications/{{ $json.id }}/sent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": false
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Energy Lab Bot API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Каждую минуту": {
+      "main": [
+        [
+          {
+            "node": "API: очередь",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API: очередь": {
+      "main": [
+        [
+          {
+            "node": "По одному",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "По одному": {
+      "main": [
+        [
+          {
+            "node": "Канал",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Канал": {
+      "main": [
+        [
+          {
+            "node": "Telegram: отправить",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "VK: отправить",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram: отправить": {
+      "main": [
+        [
+          {
+            "node": "Вернуть id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VK: отправить": {
+      "main": [
+        [
+          {
+            "node": "Вернуть id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Вернуть id": {
+      "main": [
+        [
+          {
+            "node": "API: отметить отправленным",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Moscow"
+  },
+  "tags": [
+    {
+      "name": "energy-lab"
+    },
+    {
+      "name": "уведомления"
+    }
+  ],
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "pinData": {}
+}

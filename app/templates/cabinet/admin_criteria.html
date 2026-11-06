@@ -1,0 +1,19 @@
+{% extends "cabinet/_layout.html" %}{% set nav = 'criteria' %}
+{% block page_title %}Критерии{% endblock %}
+{% block main %}
+<h1 style="font-size:2rem">Критерии, веса и площадки</h1>
+<form method="post" class="panel"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <p class="muted">Веса можно вводить в любых единицах — при сохранении система нормирует их так, чтобы сумма была 1.</p>
+  {% for d in departments %}
+  <fieldset style="border:1px solid var(--orbit);border-radius:var(--radius-m);padding:1rem;margin:0 0 1rem"><legend>{{ d.name }}</legend>
+    <div class="field" style="max-width:220px"><label for="dw{{ d.id }}">Вес отдела α</label><input id="dw{{ d.id }}" name="dept_{{ d.id }}" value="{{ d.weight }}"></div>
+    {% for c in d.criteria %}<div class="grid-3"><div class="field"><label for="cn{{ c.id }}">{{ c.code }}</label><input id="cn{{ c.id }}" name="name_{{ c.id }}" value="{{ c.name }}"></div><div class="field"><label for="cw{{ c.id }}">Вес</label><input id="cw{{ c.id }}" name="crit_{{ c.id }}" value="{{ c.weight }}"></div></div>{% endfor %}
+  </fieldset>{% endfor %}
+  <button class="btn btn-launch">Сохранить и нормировать</button></form>
+<section class="panel"><h2>Площадки</h2>
+  <table><tbody>{% for v in venues %}<tr><td>{{ v.name }}</td><td class="muted">{{ v.address or '' }}</td><td class="num">{{ v.capacity or '—' }} мест</td></tr>{% else %}<tr><td class="empty">Площадок нет</td></tr>{% endfor %}</tbody></table>
+  <form method="post" action="/cabinet/admin/venues" class="grid-3" style="margin-top:1rem"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label for="vn">Название</label><input id="vn" name="name" required></div><div class="field"><label for="va">Адрес</label><input id="va" name="address"></div><div class="field"><label for="vc">Вместимость</label><input id="vc" name="capacity" type="number" min="0"></div>
+    <button class="btn">Добавить площадку</button></form>
+</section>
+{% endblock %}

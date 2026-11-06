@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Фотоальбом прошедших тусовок — Energy Lab{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/css/home.css">{% endblock %}
+{% block body %}
+{% set active = 'archive' %}{% include "partials/public_top.html" %}
+<main class="wrap" style="padding-bottom:80px">
+  <div class="event-head">
+    <h1>Фотоальбом прошедших тусовок</h1>
+    <p class="lead muted" style="font-size:1.15rem">{% if stats.launches %}{{ stats.launches }} тусовок, {{ stats.guests }} гостей{% if stats.rating %}, средняя оценка {{ stats.rating|num(1) }}{% endif %}. {% endif %}Нажмите на карточку, чтобы открыть альбом.</p>
+  </div>
+  {% if past %}
+  <ul class="album album-wide">
+    {% for ev in past %}{% set r = ev.result %}
+    <li><a class="album-card" href="/e/{{ ev.code }}">
+      {% if ev.cover %}<img src="/media/{{ ev.cover.file }}" alt="{{ ev.title }}" loading="lazy">{% else %}<span class="album-ph" aria-hidden="true"></span>{% endif %}
+      <span class="album-meta"><b>{{ ev.title }}</b><small>{{ ev.planned_date|ru_date }} · {{ ev.format.name }}</small>
+        <span class="album-tags">{% if r %}<span>{{ r.guests_count }} гостей</span>{% endif %}{% if r and r.avg_rating %}<span class="star">★ {{ r.avg_rating|num(1) }}</span>{% endif %}{% if ev.photos %}<span>{{ ev.photos|length }} фото</span>{% endif %}</span></span>
+    </a></li>
+    {% endfor %}
+  </ul>
+  {% else %}<p class="empty">Пока нет проведённых мероприятий.</p>{% endif %}
+  <p style="margin-top:2rem"><a class="btn btn-flame" href="/#request">Заказать свою тусовку</a></p>
+</main>
+{% include "partials/public_foot.html" %}
+{% endblock %}

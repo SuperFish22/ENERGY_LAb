@@ -1,0 +1,17 @@
+[project]
+name = "energy-lab"
+version = "0.1.0"
+description = "ИС экспертно-оценочных тренингов Energy Lab"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["B008"]  # Depends() в аргументах — стандартный приём FastAPI
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]

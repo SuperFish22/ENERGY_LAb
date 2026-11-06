@@ -1,0 +1,36 @@
+{% extends "cabinet/_layout.html" %}{% set nav = 'home' %}
+{% block page_title %}Обзор{% endblock %}
+{% block main %}
+<header><div><h1 style="font-size:2rem">Привет, {{ user.full_name.split()[0] }}</h1>
+  {% if next_launch %}<p class="muted">Ближайший старт — «{{ next_launch.title }}», через {{ next_launch.planned_date|days_left }} дн.</p>{% endif %}</div>
+  {% if user.has_role('member','head') %}<a class="btn btn-launch" href="/cabinet/projects/new">Новый проект</a>{% endif %}
+</header>
+<div class="cols-2">
+  <div>
+    <section class="panel"><h2>Мои задачи</h2>
+      {% for t in tasks %}
+      <div class="task"><div><div>{{ t.title }}</div><div class="muted small">{% if t.event %}{{ t.event.title }} · {% endif %}{% if t.due_date %}<span class="{{ 'overdue' if t.due_date|days_left < 0 }}">до {{ t.due_date|ru_date }}</span>{% endif %}</div></div>
+        <form method="post" action="/cabinet/tasks/{{ t.id }}/status"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="back" value="/cabinet">
+          {% if t.status == 'todo' %}<button class="btn btn-small" name="status" value="in_progress">Взять в работу</button>{% else %}<button class="btn btn-small" name="status" value="done">Готово</button>{% endif %}</form></div>
+      {% else %}<p class="empty">Задач нет. Их ставят руководители и коллеги по проекту.</p>{% endfor %}
+      <p><a href="/cabinet/tasks">Все задачи</a></p>
+    </section>
+    {% if to_rate %}
+    <section class="panel"><h2>Ждут вашей оценки</h2>
+      {% for r in to_rate %}<div class="task"><div><a href="/cabinet/projects/{{ r.ev.id }}/evaluate">{{ r.ev.title }}</a><div class="muted small">Тур {{ r.round.round_no }}{% if r.round.deadline %} · до {{ r.round.deadline|ru_date }}{% endif %}</div></div>
+        <span class="status {{ 'status-done' if r.sent else 'status-rework' }}">{{ 'Отправлено' if r.sent else 'Не оценено' }}</span></div>{% endfor %}
+    </section>{% endif %}
+  </div>
+  <div>
+    <section class="panel"><h2>Обсуждения отдела</h2>
+      {% for d in discussions %}<div class="task"><div><a href="/cabinet/discussions/{{ d.id }}">{{ d.title }}</a><div class="muted small">{{ d.department.name }} · {{ d.messages|length }} сообщ.{% if d.source != 'web' %} · из {{ 'Telegram' if d.source == 'telegram' else 'ВКонтакте' }}{% endif %}</div></div></div>
+      {% else %}<p class="empty">Открытых вопросов нет.</p>{% endfor %}
+      <p><a href="/cabinet/discussions">Задать вопрос отделу</a></p>
+    </section>
+    <section class="panel"><h2>Мои проекты</h2>
+      {% for ev in mine %}<div class="task"><a href="/cabinet/projects/{{ ev.id }}">{{ ev.title }}</a><span class="status status-{{ ev.status }}">{{ ev.stage_name }}</span></div>
+      {% else %}<p class="empty">Вы ещё не запускали проектов.</p>{% endfor %}
+    </section>
+  </div>
+</div>
+{% endblock %}

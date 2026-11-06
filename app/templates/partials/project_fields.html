@@ -1,0 +1,17 @@
+<div class="grid-2">
+  <div class="field"><label for="title">Название</label><input id="title" name="title" required minlength="3" value="{{ ev.title if ev else '' }}"></div>
+  <div class="field"><label for="fmt">Формат</label><select id="fmt" name="format_id" required>{% for f in formats %}<option value="{{ f.id }}" {% if ev and ev.format_id == f.id %}selected{% endif %}>{{ f.code }} · {{ f.name }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="dt">Дата</label><input id="dt" type="date" name="planned_date" value="{{ ev.planned_date if ev and ev.planned_date else '' }}"></div>
+  <div class="field"><label for="tm">Начало</label><input id="tm" type="time" name="start_time" value="{{ ev.start_time if ev and ev.start_time else '' }}"></div>
+  <div class="field"><label for="vn">Площадка</label><select id="vn" name="venue_id"><option value="">Уточняется</option>{% for v in venues %}<option value="{{ v.id }}" {% if ev and ev.venue_id == v.id %}selected{% endif %}>{{ v.name }}{% if v.capacity %} ({{ v.capacity }} мест){% endif %}</option>{% endfor %}</select></div>
+  <div class="field"><label for="cap">Вместимость, чел.</label><input id="cap" type="number" min="1" name="capacity" value="{{ ev.capacity if ev and ev.capacity else '' }}"></div>
+  <div class="field"><label for="pr">Цена билета, ₽</label><input id="pr" name="ticket_price" inputmode="decimal" value="{{ ev.ticket_price if ev else '0' }}"></div>
+  <div class="field"><label for="bd">Плановый бюджет, ₽</label><input id="bd" name="planned_budget" inputmode="decimal" value="{{ ev.planned_budget if ev else '0' }}"></div>
+  <div class="field"><label for="age">Возрастная категория (436-ФЗ)</label><select id="age" name="age_rating" required>{% for a in ages %}<option {% if ev and ev.age_rating == a %}selected{% endif %}>{{ a }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="ta">Целевая аудитория</label><input id="ta" name="target_audience" value="{{ ev.target_audience if ev and ev.target_audience else '' }}"></div>
+</div>
+<div class="field"><label for="ds">Описание для гостей и экспертов</label><textarea id="ds" name="description" rows="5">{{ ev.description if ev and ev.description else '' }}</textarea></div>
+<div class="grid-2">
+  <div class="field"><label for="tpid">ID события в Timepad</label><input id="tpid" name="timepad_event_id" value="{{ ev.timepad_event_id if ev and ev.timepad_event_id else '' }}"></div>
+  <div class="field"><label for="tpurl">Ссылка на страницу Timepad</label><input id="tpurl" name="timepad_url" type="url" value="{{ ev.timepad_url if ev and ev.timepad_url else '' }}"></div>
+</div>

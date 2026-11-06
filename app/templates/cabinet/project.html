@@ -1,0 +1,184 @@
+{% extends "cabinet/_layout.html" %}{% set nav = 'projects' %}
+{% block page_title %}{{ ev.title }}{% endblock %}
+{% block main %}
+<header>
+  <div><p class="muted" style="margin:0">{{ ev.code }} · {{ ev.format.name }}{% if ev.author %} · автор {{ ev.author.full_name }}{% endif %}</p>
+    <h1 style="font-size:2rem;margin:.2rem 0">{{ ev.title }}</h1></div>
+  <div class="row-actions">
+    {% if my_round_open %}<a class="btn btn-launch" href="/cabinet/projects/{{ ev.id }}/evaluate">Оценить проект</a>{% endif %}
+    {% for to, who in transitions.items() if to in ('review','on_sale','held') %}
+    <form method="post" action="/cabinet/projects/{{ ev.id }}/status" class="inline-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="btn {{ 'btn-launch' if not my_round_open }}" name="to" value="{{ to }}">{{ {'review':'Отправить на экспертизу','on_sale':'Открыть продажи','held':'Отметить «Проведён»'}[to] }}</button></form>
+    {% endfor %}
+  </div>
+</header>
+{% include "partials/tracker.html" %}
+{% set tabs = [('overview','Обзор'),('stations','Станции'),('expertise','Экспертиза'),('forecast','Прогноз и решение'),('tasks','Задачи'),('fact','Билеты и факт'),('photos','Фотоальбом')] %}
+<nav class="tabs" aria-label="Разделы проекта">{% for k,t in tabs %}<a href="?tab={{ k }}" {% if tab == k %}aria-current="page"{% endif %}>{{ t }}</a>{% endfor %}{% if can_edit %}<a href="?tab=edit" {% if tab == 'edit' %}aria-current="page"{% endif %}>Изменить</a>{% endif %}</nav>
+
+{% if tab == 'overview' %}
+<dl class="kpi">
+  <div><b>{{ ev.planned_date|ru_date }}</b><span>дата{% if ev.start_time %}, {{ ev.start_time }}{% endif %}</span></div>
+  <div><b>{{ ev.ticket_price|money }}</b><span>билет · {{ ev.age_rating }}</span></div>
+  <div><b>{{ ev.capacity or '—' }}</b><span>мест{% if ev.venue %} · {{ ev.venue.name }}{% endif %}</span></div>
+  <div><b>{{ ev.planned_budget|money }}</b><span>плановый бюджет</span></div>
+  <div><b>{{ ev.stations|sum(attribute='duration_min') }} мин</b><span>{{ ev.stations|length }} станций</span></div>
+</dl>
+<section class="panel"><h2>Концепция</h2><p>{{ ev.description or 'Описание не заполнено.' }}</p>{% if ev.target_audience %}<p class="muted">Аудитория: {{ ev.target_audience }}</p>{% endif %}</section>
+<section class="panel"><h2>Выгрузка</h2><p class="muted">Метки для шаблонов Google Диска. Гости и контакты в выгрузку не попадают.</p><p class="row-actions"><a class="btn ghost" href="/cabinet/projects/{{ ev.id }}/export.json">Скачать JSON</a> <a class="btn ghost" href="/cabinet/projects/{{ ev.id }}/export.csv">Скачать CSV</a></p></section>
+{% if decisions %}<section class="panel"><h2>Решения руководителей</h2>{% for d in decisions %}<div class="msg"><div class="who">{{ d.created_at|ru_date }} · {{ statuses[d.decision][0] }}</div>{{ d.comment or '' }}</div>{% endfor %}</section>{% endif %}
+
+{% elif tab == 'stations' %}
+<section class="panel"><h2>Маршрут: {{ ev.stations|length }} станций, {{ ev.stations|sum(attribute='duration_min') }} мин, {{ ev.stations|sum(attribute='cost')|money }}</h2>
+  {% set total = ev.stations|sum(attribute='cost') %}{% if ev.planned_budget and total > ev.planned_budget %}<p class="flash warn">Стоимость станций выше планового бюджета на {{ (total - ev.planned_budget)|money }}.</p>{% endif %}
+  <div class="table-wrap"><table><thead><tr><th>№</th><th>Станция</th><th class="num">Мин</th><th class="num">Стоимость</th><th>Ответственный</th>{% if can_edit %}<th></th>{% endif %}</tr></thead><tbody>
+  {% for st in ev.stations %}
+  <tr>{% if can_edit %}{% set f = 'stf' ~ st.id %}
+    <td>{{ st.order_no }}</td><td><input form="{{ f }}" name="title" value="{{ st.title }}" aria-label="Название"><input form="{{ f }}" name="description" value="{{ st.description or '' }}" placeholder="Описание" style="margin-top:.3rem" aria-label="Описание"></td>
+    <td><input form="{{ f }}" name="duration_min" type="number" min="1" value="{{ st.duration_min }}" style="width:5.5em" aria-label="Минуты"></td>
+    <td><input form="{{ f }}" name="cost" inputmode="decimal" value="{{ st.cost }}" style="width:7em" aria-label="Стоимость"></td>
+    <td><select form="{{ f }}" name="responsible_id" aria-label="Ответственный"><option value="">—</option>{% for u in users %}<option value="{{ u.id }}" {% if st.responsible_id == u.id %}selected{% endif %}>{{ u.full_name }}</option>{% endfor %}</select></td>
+    <td class="row-actions"><button form="{{ f }}" class="btn btn-small" name="action" value="save">Сохранить</button><button form="{{ f }}" class="btn btn-small" name="action" value="up" aria-label="Выше">↑</button><button form="{{ f }}" class="btn btn-small" name="action" value="down" aria-label="Ниже">↓</button><button form="{{ f }}" class="btn btn-small" name="action" value="delete">Удалить</button></td>
+  {% else %}<td>{{ st.order_no }}</td><td>{{ st.title }}<div class="muted small">{{ st.description or '' }}</div></td><td class="num">{{ st.duration_min }}</td><td class="num">{{ st.cost|money }}</td><td>{{ st.responsible.full_name if st.responsible else '—' }}</td>{% endif %}</tr>
+  {% else %}<tr><td colspan="6" class="empty">Станций пока нет. Добавьте первую — без станций проект не отправить на экспертизу.</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% if can_edit %}{% for st in ev.stations %}<form id="stf{{ st.id }}" method="post" action="/cabinet/projects/{{ ev.id }}/stations/{{ st.id }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"></form>{% endfor %}{% endif %}
+</section>
+{% if can_edit %}
+<form method="post" action="/cabinet/projects/{{ ev.id }}/stations" class="panel"><h2>Добавить станцию</h2><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <div class="grid-3"><div class="field"><label for="st">Название</label><input id="st" name="title" required></div>
+  <div class="field"><label for="sd">Длительность, мин</label><input id="sd" name="duration_min" type="number" min="1" value="15"></div>
+  <div class="field"><label for="sc">Стоимость, ₽</label><input id="sc" name="cost" inputmode="decimal" value="0"></div></div>
+  <div class="field"><label for="sdesc">Описание</label><input id="sdesc" name="description"></div>
+  <button class="btn btn-launch">Добавить станцию</button></form>
+{% endif %}
+
+{% elif tab == 'expertise' %}
+<div class="cols-2"><div>
+  <section class="panel"><h2>Тур экспертизы</h2>
+  {% if summ.round %}<p>Тур {{ summ.round.round_no }} · {{ 'открыт' if summ.round.is_open else 'закрыт' }}{% if summ.round.deadline %} · срок {{ summ.round.deadline|ru_date }}{% endif %}{% if summ.round.kendall_w is not none %} · W = {{ summ.round.kendall_w|num }}{% endif %}</p>
+    <table><thead><tr><th>Эксперт</th><th>Отдел</th><th>Статус</th></tr></thead><tbody>{% for p in summ.progress %}<tr><td>{{ p.expert.user.full_name }}</td><td>{{ p.expert.department.name }}</td><td><span class="status {{ 'status-done' if p.sent else 'status-rework' }}">{{ 'Отправил' if p.sent else 'Ждём' }}</span></td></tr>{% endfor %}</tbody></table>
+  {% else %}<p class="empty">Туров ещё не было.</p>{% endif %}
+  {% if user.has_role('head') and ev.status == 'review' %}
+    <div class="row-actions" style="margin-top:1rem">
+    {% if not summ.round or not summ.round.is_open %}<form method="post" action="/cabinet/projects/{{ ev.id }}/rounds" class="row-actions"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label for="dl" class="sr">Срок</label><input id="dl" type="date" name="deadline" style="max-width:11rem"><button class="btn btn-launch">{{ 'Открыть второй тур Дельфи' if summ.round else 'Открыть тур' }}</button></form>{% endif %}
+    {% if summ.round and summ.round.is_open %}<form method="post" action="/cabinet/projects/{{ ev.id }}/rounds/close"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn">Закрыть тур</button></form>{% endif %}
+    {% if summ.round and not summ.round.is_open %}<form method="post" action="/cabinet/projects/{{ ev.id }}/forecast"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn btn-launch">Рассчитать прогноз</button></form>{% endif %}
+    </div>{% endif %}
+  </section>
+  {% if can_see_results and summ.round %}
+  <section class="panel"><h2>Станции: баллы и риски</h2>
+    <div class="table-wrap"><table><thead><tr><th>Станция</th><th class="num">S</th><th class="num">P</th><th class="num">I</th><th class="num">R</th><th>Зона</th>{% if ev.status in ('held','analyzed') %}<th class="num">Гости</th>{% endif %}</tr></thead><tbody>
+    {% for s in summ.stations %}<tr><td>{{ s.station.title }}</td><td class="num">{{ s.S|num }}</td><td class="num">{{ s.P|num(1) }}</td><td class="num">{{ s.I|num(1) }}</td><td class="num">{{ s.R|num(1) }}</td><td class="zone-{{ s.zone }}">{{ s.zone_name }}</td>{% if ev.status in ('held','analyzed') %}<td class="num">{{ st_fb[s.station.id]|num(1) }}</td>{% endif %}</tr>{% endfor %}
+    </tbody></table></div>
+    <p class="small muted">S — оценка экспертов (1–5), P и I — вероятность и последствия провала, R = P·I. Риск провала мероприятия Q = {{ summ.Q|num if summ.Q is not none else '—' }}.</p>
+  </section>{% endif %}
+</div><div>
+  {% if user.has_role('head') %}
+  <form method="post" action="/cabinet/projects/{{ ev.id }}/experts" class="panel"><h2>Эксперты проекта</h2><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    {% for d in departments %}<fieldset style="border:0;padding:0;margin:0 0 .8rem"><legend class="muted small">{{ d.name }}</legend>
+      {% for ex in experts if ex.department_id == d.id %}<label style="color:var(--star)"><input type="checkbox" name="expert_id" value="{{ ex.id }}" {% if ex.id in assigned %}checked{% endif %} {% if ex.user_id == ev.author_id %}disabled{% endif %}> {{ ex.user.full_name }} <span class="muted small">c = {{ ex.competence|num }}{% if ex.user_id == ev.author_id %} · автор{% endif %}</span></label>{% else %}<p class="muted small">Нет экспертов</p>{% endfor %}</fieldset>{% endfor %}
+    <button class="btn">Сохранить состав</button></form>
+  {% endif %}
+  {% if can_see_results and summ.S is not none %}
+  <section class="panel"><h2>Итог по отделам</h2>
+    <dl class="kpi"><div><b>{{ summ.S|num }}</b><span>итоговая оценка S</span></div><div><b>{{ summ.W|num if summ.W is not none else '—' }}</b><span>согласованность W</span></div></dl>
+    <table><tbody>{% for name, v in summ.departments.items() %}<tr><td>{{ name }}</td><td class="num">{{ v|num }}</td></tr>{% endfor %}</tbody></table>
+    {% if summ.missing_departments %}<p class="flash warn small">Нет оценок отделов: {{ summ.missing_departments|join(', ') }}. Их вес распределён между остальными.</p>{% endif %}
+  </section>{% endif %}
+</div></div>
+
+{% elif tab == 'forecast' %}
+{% if fc and can_see_results %}
+<section class="panel"><h2>Прогноз от {{ fc.created_at|ru_date }} — рекомендация: {{ fc.recommendation }}</h2>
+  {% if fc.reasons %}<ul>{% for r in fc.reasons %}<li>{{ r }}</li>{% endfor %}</ul>{% endif %}
+  <div class="table-wrap"><table><thead><tr><th>Показатель</th><th class="num">Прогноз</th><th class="num">Интервал</th>{% if ev.result %}<th class="num">Факт</th>{% endif %}</tr></thead><tbody>
+    <tr><td>Явка, чел.</td><td class="num">{{ fc.attendance if fc.attendance is not none else '—' }}</td><td class="num">{% if fc.attendance_low is not none %}{{ fc.attendance_low }}–{{ fc.attendance_high }}{% else %}—{% endif %}</td>{% if ev.result %}<td class="num">{{ ev.result.guests_count }}</td>{% endif %}</tr>
+    <tr><td>Продано билетов</td><td class="num">{{ fc.tickets_sold if fc.tickets_sold is not none else '—' }}</td><td></td>{% if ev.result %}<td class="num">{{ ev.result.tickets_sold }}</td>{% endif %}</tr>
+    <tr><td>Выручка</td><td class="num">{{ fc.revenue|money }}</td><td></td>{% if ev.result %}<td class="num">{{ ev.result.revenue|money }}</td>{% endif %}</tr>
+    <tr><td>Фактический бюджет</td><td class="num">{{ fc.budget|money }}</td><td></td>{% if ev.result %}<td class="num">{{ ev.result.actual_cost|money }}</td>{% endif %}</tr>
+    <tr><td>Средняя оценка гостей</td><td class="num">{{ fc.avg_rating|num }}</td><td></td>{% if ev.result %}<td class="num">{{ ev.result.avg_rating|num }}</td>{% endif %}</tr>
+    <tr><td>Риск провала Q</td><td class="num">{{ fc.failure_risk|num }}</td><td></td>{% if ev.result %}<td></td>{% endif %}</tr>
+  </tbody></table></div>
+  {% if fc.analogs %}<p class="muted">Аналоги: {% for a in fc.analogs %}{{ a.title }} (d = {{ a.distance|num }}){% if not loop.last %}; {% endif %}{% endfor %}</p>{% endif %}
+  <p><a href="/cabinet/projects/{{ ev.id }}/conclusion">Экспертное заключение для печати</a></p>
+</section>
+{% else %}<p class="empty">Прогноз появится после закрытия тура экспертизы. Его рассчитывает руководитель.</p>{% endif %}
+{% set decide = transitions.keys()|select('in', ['approved','rework','rejected'])|list %}
+{% if decide %}
+<form method="post" action="/cabinet/projects/{{ ev.id }}/status" class="panel"><h2>Решение по проекту</h2><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <div class="field"><label for="cm">Комментарий для автора (обязателен при доработке)</label><textarea id="cm" name="comment"></textarea></div>
+  <div class="row-actions">{% if 'approved' in decide %}<button class="btn btn-launch" name="to" value="approved">Утвердить</button>{% endif %}{% if 'rework' in decide %}<button class="btn" name="to" value="rework">Вернуть на доработку</button>{% endif %}{% if 'rejected' in decide %}<button class="btn" name="to" value="rejected">Отклонить</button>{% endif %}</div>
+</form>{% endif %}
+
+{% elif tab == 'tasks' %}
+<section class="panel"><h2>Задачи подготовки</h2>
+  {% for t in tasks %}<div class="task"><div><div>{{ t.title }}</div><div class="muted small">{{ t.assignee.full_name if t.assignee else 'без исполнителя' }}{% if t.department %} · {{ t.department.name }}{% endif %}{% if t.due_date %} · до {{ t.due_date|ru_date }}{% endif %}</div></div><span class="status status-{{ t.status }}">{{ t.status_name }}</span></div>
+  {% else %}<p class="empty">Задач пока нет.</p>{% endfor %}
+</section>
+<form method="post" action="/cabinet/tasks" class="panel"><h2>Поставить задачу</h2><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="event_id" value="{{ ev.id }}"><input type="hidden" name="back" value="/cabinet/projects/{{ ev.id }}?tab=tasks">
+  <div class="grid-2"><div class="field"><label for="tt">Задача</label><input id="tt" name="title" required></div>
+  <div class="field"><label for="ta">Исполнитель</label><select id="ta" name="assignee_id">{% for u in users %}<option value="{{ u.id }}" {% if u.id == user.id %}selected{% endif %}>{{ u.full_name }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="tdp">Отдел</label><select id="tdp" name="department_id"><option value="">—</option>{% for d in departments %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="tdd">Срок</label><input id="tdd" type="date" name="due_date"></div></div>
+  <button class="btn btn-launch">Поставить задачу</button></form>
+
+{% elif tab == 'fact' %}
+<div class="cols-2"><div>
+  <section class="panel"><h2>Билеты: {{ tickets|selectattr('status','ne','refunded')|list|length }} оплачено</h2>
+    <p class="muted small">Выгрузка заказов из Timepad (CSV). Повторная загрузка того же файла не создаёт дублей.</p>
+    {% if user.has_role('head') %}<form method="post" action="/cabinet/projects/{{ ev.id }}/tickets/import" enctype="multipart/form-data" class="row-actions"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="file" name="file" accept=".csv,text/csv" required aria-label="Файл выгрузки"><button class="btn">Загрузить</button></form>{% endif %}
+  </section>
+  <section class="panel"><h2>Анкеты гостей: {{ feedbacks|length }}</h2>
+    {% if feedbacks %}<p>Средняя оценка: <b>{{ (feedbacks|sum(attribute='rating') / feedbacks|length)|num }}</b></p>{% endif %}
+    <p class="small">Ссылка для QR-кода на мероприятии: <code>/e/{{ ev.code }}/feedback</code></p>
+    {% for f in feedbacks[:5] if f.comment %}<div class="msg">{{ f.rating }}/5 — {{ f.comment }}</div>{% endfor %}
+  </section>
+</div><div>
+  {% if user.has_role('head') %}{% set r = ev.result %}
+  {% set paid = tickets|selectattr('status','ne','refunded')|list %}
+  <form method="post" action="/cabinet/projects/{{ ev.id }}/result" class="panel"><h2>Фактические показатели</h2><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="grid-2">
+      <div class="field"><label for="g">Пришло гостей</label><input id="g" name="guests_count" type="number" min="0" required value="{{ r.guests_count if r else paid|length }}"></div>
+      <div class="field"><label for="ts">Продано билетов</label><input id="ts" name="tickets_sold" type="number" min="0" required value="{{ r.tickets_sold if r else paid|length }}"></div>
+      <div class="field"><label for="rv">Выручка, ₽</label><input id="rv" name="revenue" inputmode="decimal" required value="{{ r.revenue if r else paid|sum(attribute='price') }}"></div>
+      <div class="field"><label for="ac">Фактические затраты, ₽</label><input id="ac" name="actual_cost" inputmode="decimal" required value="{{ r.actual_cost if r else '' }}"></div>
+      <div class="field"><label for="ar">Средняя оценка гостей</label><input id="ar" name="avg_rating" inputmode="decimal" value="{{ r.avg_rating if r and r.avg_rating else ((feedbacks|sum(attribute='rating') / feedbacks|length)|round(2) if feedbacks else '') }}"></div>
+    </div>
+    <div class="row-actions"><button class="btn">Сохранить</button>{% if ev.status == 'held' %}<button class="btn btn-launch" name="finalize" value="1">Зафиксировать и завершить разбор полёта</button>{% endif %}</div>
+  </form>{% endif %}
+</div></div>
+
+{% elif tab == 'photos' %}
+<section class="panel"><h2>Фотоальбом</h2>
+  <p class="muted">Фото появятся на главной в блоке «Фотоальбом» и на странице мероприятия, когда оно проведено. Первое фото — обложка.</p>
+  {% if user.has_role('head') or ev.author_id == user.id %}
+  <form method="post" action="/cabinet/projects/{{ ev.id }}/photos" enctype="multipart/form-data" class="row-actions" style="margin-bottom:1rem">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label for="ph-files" class="sr">Фотографии</label><input id="ph-files" type="file" name="files" accept="image/jpeg,image/png,image/webp" multiple required style="max-width:22rem">
+    <label for="ph-cap" class="sr">Подпись</label><input id="ph-cap" name="caption" placeholder="Подпись ко всем фото (необязательно)" maxlength="200" style="max-width:20rem">
+    <button class="btn btn-launch">Загрузить</button>
+  </form>
+  <p class="small muted">JPG, PNG или WebP до 8 МБ. Публикуйте фото гостей только с их согласия; детей — с согласия родителей.</p>
+  {% endif %}
+  {% if ev.photos %}
+  <ul class="photo-grid">
+    {% for ph in ev.photos %}<li>
+      <img src="/media/{{ ph.file }}" alt="{{ ph.caption or ev.title }}" loading="lazy">
+      <form method="post" action="/cabinet/projects/{{ ev.id }}/photos/{{ ph.id }}" class="photo-tools">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input name="caption" value="{{ ph.caption or '' }}" placeholder="Подпись" aria-label="Подпись" maxlength="200">
+        <div class="row-actions">
+          <button class="btn btn-small" name="action" value="caption">Сохранить</button>
+          {% if not ph.is_cover %}<button class="btn btn-small" name="action" value="cover">Сделать обложкой</button>{% else %}<span class="status status-done">Обложка</span>{% endif %}
+          <button class="btn btn-small" name="action" value="delete">Удалить</button>
+        </div>
+      </form>
+    </li>{% endfor %}
+  </ul>
+  {% else %}<p class="empty">Фото пока нет.</p>{% endif %}
+</section>
+{% elif tab == 'edit' and can_edit %}
+<form method="post" class="panel"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">{% include "partials/project_fields.html" %}<button class="btn btn-launch">Сохранить изменения</button></form>
+{% endif %}
+{% endblock %}

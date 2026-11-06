@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Афиша — Energy Lab{% endblock %}
+{% block body %}
+{% set active = 'afisha' %}{% include "partials/public_top.html" %}
+<main class="wrap" style="padding:24px 24px 64px">
+  <h1>Афиша</h1>
+  {% if groups|length > 1 %}
+  <ul class="chips" aria-label="Фильтр по формату">
+    <li class="{{ 'chip-on' if not group }}"><a href="/afisha" style="text-decoration:none">Все</a></li>
+    {% for g in groups %}<li class="{{ 'chip-on' if g == group }}"><a href="/afisha?group={{ g }}" style="text-decoration:none">{{ g }}</a></li>{% endfor %}
+  </ul>
+  {% endif %}
+  {% if events %}
+  <ul class="launch-list">{% for ev in events %}{% include "partials/event_row.html" %}{% endfor %}</ul>
+  {% else %}
+  <p class="empty">Сейчас открытых продаж нет. Подпишитесь на ENERGY во ВКонтакте — анонс выйдет там первым.</p>
+  {% endif %}
+</main>
+{% include "partials/public_foot.html" %}
+{% endblock %}

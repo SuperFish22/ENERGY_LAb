@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}{{ ev.title }} — Energy Lab{% endblock %}
+{% block head %}
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Event","name":{{ ev.title|tojson }},"startDate":"{{ ev.planned_date }}","location":{"@type":"Place","name":{{ (ev.venue.name if ev.venue else 'Уточняется')|tojson }}},"offers":{"@type":"Offer","price":"{{ ev.ticket_price }}","priceCurrency":"RUB"}}</script>
+{% endblock %}
+{% block body %}
+{% include "partials/public_top.html" %}
+<main class="wrap" style="padding-bottom:64px">
+  {% if request.query_params.get('thanks') %}<div class="flash" role="status">Спасибо! Ваша оценка поможет запустить следующий проект ещё лучше.</div>{% endif %}
+  {% include "partials/flash.html" %}
+  <div class="event-head">
+    <p class="muted">{{ ev.format.name }} · <span class="age">{{ ev.age_rating }}</span></p>
+    <h1>{{ ev.title }}</h1>
+    {% if ev.description %}<p class="lead muted" style="font-size:1.15rem">{{ ev.description }}</p>{% endif %}
+  </div>
+  <dl class="facts">
+    <div><dt>Дата</dt><dd>{{ ev.planned_date|date_long }}{% if ev.start_time %}, {{ ev.start_time }}{% endif %}</dd></div>
+    <div><dt>Площадка</dt><dd>{{ ev.venue.name if ev.venue else 'Уточняется' }}</dd></div>
+    <div><dt>Длительность</dt><dd>{{ ev.stations|sum(attribute='duration_min') }} мин</dd></div>
+    <div><dt>Билет</dt><dd>{% if ev.ticket_price and ev.ticket_price > 0 %}{{ ev.ticket_price|money }}{% else %}Бесплатно{% endif %}</dd></div>
+  </dl>
+  {% if ev.venue and ev.venue.address %}<p class="muted">Адрес: {{ ev.venue.address }} · <a href="https://yandex.ru/maps/?text={{ ev.venue.address|urlencode }}" rel="noopener">Открыть на Яндекс Картах</a></p>{% endif %}
+
+  {% if ev.status == 'on_sale' %}
+  <div class="buy" id="buy">
+    <h2>Билеты</h2>
+    <p class="small muted">Билеты продаёт Timepad: оплата картой или СБП, электронный чек по 54-ФЗ придёт на почту. Возврат — по правилам Timepad и Основ законодательства о культуре (ст. 52.1): полная стоимость не позднее чем за 10 дней до мероприятия, 50 % — за 5–10 дней, 30 % — за 3–5 дней.</p>
+    {% if ev.timepad_event_id %}
+    <div id="timepad-widget" data-event="{{ ev.timepad_event_id }}"></div>
+    <noscript><a class="btn btn-launch" href="{{ ev.timepad_url or '#' }}">Купить на Timepad</a></noscript>
+    <p id="tp-fallback" hidden><a class="btn btn-launch" href="{{ ev.timepad_url or 'https://timepad.ru' }}" rel="noopener">Купить билет на Timepad</a></p>
+    <script>
+      // Виджет Timepad: если скрипт не загрузился за 5 с — показываем ссылку (LAB-04)
+      (function(){var s=document.createElement('script');s.async=true;s.defer=true;
+        s.src='https://timepad.ru/js/tpwf/loader/min/loader.js';
+        s.setAttribute('data-timepad-customized','');s.setAttribute('data-twf2s-event--id',{{ ev.timepad_event_id|tojson }});
+        s.setAttribute('data-timepad-widget-v2','event_register');
+        var box=document.getElementById('timepad-widget');box.appendChild(s);
+        setTimeout(function(){if(!box.querySelector('iframe')){document.getElementById('tp-fallback').hidden=false;}},5000);})();
+    </script>
+    {% elif ev.timepad_url %}
+    <a class="btn btn-launch" href="{{ ev.timepad_url }}" rel="noopener">Купить билет на Timepad</a>
+    {% else %}
+    <p>Продажа откроется в ближайшее время.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if ev.stations %}
+  <section class="block" style="padding-top:32px"><h2>Маршрут полёта</h2>
+    <ol class="stages" style="grid-template-columns:repeat({{ [ev.stations|length,5]|min }},1fr)">
+      {% for st in ev.stations %}<li><h3>{{ st.title }}</h3><p class="muted small">{{ st.duration_min }} мин</p></li>{% endfor %}
+    </ol>
+  </section>
+  {% endif %}
+  {% if ev.status in ('held', 'analyzed') %}
+  <section class="block past-event" style="padding-top:32px">
+    <h2>Как это было</h2>
+    {% if ev.result %}<dl class="facts">
+      <div><dt>Гостей</dt><dd>{{ ev.result.guests_count }}{% if ev.capacity %} из {{ ev.capacity }}{% endif %}</dd></div>
+      {% if ev.result.avg_rating %}<div><dt>Оценка гостей</dt><dd>★ {{ ev.result.avg_rating|num(1) }} из 5</dd></div>{% endif %}
+    </dl>{% endif %}
+    {% if ev.photos %}
+    <ul class="public-album">{% for ph in ev.photos %}<li><a href="/media/{{ ph.file }}" target="_blank" rel="noopener"><img src="/media/{{ ph.file }}" alt="{{ ph.caption or ev.title }}" loading="lazy"></a>{% if ph.caption %}<span>{{ ph.caption }}</span>{% endif %}</li>{% endfor %}</ul>
+    {% else %}<p class="muted">Фото скоро появятся.</p>{% endif %}
+    <p class="row-actions" style="margin-top:1.5rem"><a class="btn" href="/e/{{ ev.code }}/feedback">Оценить мероприятие</a><a class="btn btn-launch" href="/#request">Хочу такую же тусовку</a><a class="btn" href="/archive">Все прошедшие тусовки</a></p>
+  </section>
+  {% endif %}
+</main>
+{% include "partials/public_foot.html" %}
+{% endblock %}

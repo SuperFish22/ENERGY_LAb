@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{% block page_title %}Кабинет{% endblock %} — Energy Lab{% endblock %}
+{% block body %}
+<div class="cab">
+  <aside class="side">
+    <a class="logo" href="/"><img class="logo-mark" src="/static/img/logo.svg" alt="">Energy Lab</a>
+    <nav aria-label="Кабинет" style="margin-top:1.5rem">
+      <div class="group">Центр управления</div>
+      <a href="/cabinet" {% if nav == 'home' %}aria-current="page"{% endif %}>Обзор</a>
+      <a href="/cabinet/projects" {% if nav == 'projects' %}aria-current="page"{% endif %}>Проекты</a>
+      <a href="/cabinet/tasks" {% if nav == 'tasks' %}aria-current="page"{% endif %}>Задачи</a>
+      <a href="/cabinet/discussions" {% if nav == 'disc' %}aria-current="page"{% endif %}>Обсуждения</a>
+      {% if user.has_role('head') %}
+      <div class="group">Руководителю</div>
+      <a href="/cabinet/requests" {% if nav == 'requests' %}aria-current="page"{% endif %}>Заявки на тусовки</a>
+      <a href="/cabinet/admin/site" {% if nav == 'site' %}aria-current="page"{% endif %}>Главная страница</a>
+      <a href="/cabinet/admin/questions" {% if nav == 'questions' %}aria-current="page"{% endif %}>Доска и SOS</a>
+      <a href="/cabinet/admin/users" {% if nav == 'users' %}aria-current="page"{% endif %}>Экипаж</a>
+      <a href="/cabinet/admin/criteria" {% if nav == 'criteria' %}aria-current="page"{% endif %}>Критерии и площадки</a>
+      <a href="/cabinet/registry.csv">Реестр (CSV)</a>
+      {% endif %}
+      <a href="/cabinet/profile" {% if nav == 'profile' %}aria-current="page"{% endif %}>Профиль и бот</a>
+    </nav>
+    <div class="me">
+      <div>{{ user.full_name }}</div>
+      <div class="muted small">{% for r in user.role_codes %}{{ ROLE_NAMES[r] }}{% if not loop.last %}, {% endif %}{% endfor %}{% if user.expert %} · {{ user.expert.department.name }}{% endif %}</div>
+      <form method="post" action="/logout" style="margin-top:.6rem"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn-link">Выйти</button></form>
+    </div>
+  </aside>
+  <main class="main">
+    {% include "partials/flash.html" %}
+    {% block main %}{% endblock %}
+  </main>
+</div>
+{% endblock %}
