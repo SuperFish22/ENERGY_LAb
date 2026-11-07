@@ -164,14 +164,6 @@
     "executionOrder": "v1",
     "timezone": "Europe/Moscow"
   },
-  "tags": [
-    {
-      "name": "energy-lab"
-    },
-    {
-      "name": "vk"
-    }
-  ],
   "meta": {
     "templateCredsSetupCompleted": false
   },

@@ -289,14 +289,6 @@
     "executionOrder": "v1",
     "timezone": "Europe/Moscow"
   },
-  "tags": [
-    {
-      "name": "energy-lab"
-    },
-    {
-      "name": "уведомления"
-    }
-  ],
   "meta": {
     "templateCredsSetupCompleted": false
   },

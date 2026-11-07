@@ -49,7 +49,8 @@ WF_IDS = {"telegram-bot.json": "elabTelegramBot1", "notifications-outbox.json": 
 def wf(name, nodes, conns, tags):
     return {"name": name, "nodes": nodes, "connections": conns, "active": False,
             "settings": {"executionOrder": "v1", "timezone": "Europe/Moscow"},
-            "tags": [{"name": t} for t in tags], "meta": {"templateCredsSetupCompleted": False},
+            # без тегов: n8n при импорте пытается создать тег заново и падает на UNIQUE(tag_entity.name)
+            "meta": {"templateCredsSetupCompleted": False},
             "pinData": {}}
 
 

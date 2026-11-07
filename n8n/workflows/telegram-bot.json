@@ -869,14 +869,6 @@
     "executionOrder": "v1",
     "timezone": "Europe/Moscow"
   },
-  "tags": [
-    {
-      "name": "energy-lab"
-    },
-    {
-      "name": "telegram"
-    }
-  ],
   "meta": {
     "templateCredsSetupCompleted": false
   },

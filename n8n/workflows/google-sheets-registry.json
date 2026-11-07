@@ -143,14 +143,6 @@
     "executionOrder": "v1",
     "timezone": "Europe/Moscow"
   },
-  "tags": [
-    {
-      "name": "energy-lab"
-    },
-    {
-      "name": "google"
-    }
-  ],
   "meta": {
     "templateCredsSetupCompleted": false
   },

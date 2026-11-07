@@ -46,6 +46,7 @@ for f in sorted(glob.glob("workflows/*.json")):
                 missing.append(ref.get("name"))
     want = bool(old and old.get("active")) and not missing
     w["active"] = False                                     # включаем после импорта отдельной командой
+    w.pop("tags", None)                                     # теги при импорте создаются заново → ошибка UNIQUE
     if want:
         activate.append(w["id"])
     json.dump(w, open(f"{tmp}/new/{os.path.basename(f)}", "w"), ensure_ascii=False)
