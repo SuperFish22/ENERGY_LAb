@@ -1,0 +1,81 @@
+# Доставка сценариев бота на внешний сервер n8n.
+# Срабатывает только когда в main меняется папка n8n/. Код сайта и данные на этот сервер не попадают.
+# Сам n8n уже работает на сервере (контейнер n8n); сюда копируются только сценарии и deploy.sh.
+# Нужны: окружение "n8n" (Settings → Environments, Required reviewers) и секреты
+# N8N_SSH_HOST, N8N_SSH_USER, N8N_SSH_KEY, N8N_SSH_PORT.
+name: n8n
+on:
+  push:
+    branches: [main]
+    paths: ["n8n/**", ".github/workflows/n8n.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - name: Сценарии собраны из generate.py и корректны
+        run: |
+          python n8n/generate.py /tmp/wf > /dev/null
+          diff -r /tmp/wf n8n/workflows || (echo "::error::workflows/*.json не совпадают с generate.py — запустите python n8n/generate.py n8n/workflows" && exit 1)
+          python - <<'PY'
+          import glob, json
+          ids = set()
+          for f in glob.glob("n8n/workflows/*.json"):
+              w = json.load(open(f, encoding="utf-8"))
+              names = {n["name"] for n in w["nodes"]}
+              assert w.get("id") and w["id"] not in ids, f"{f}: нет id или он повторяется"
+              ids.add(w["id"])
+              for src, c in w["connections"].items():
+                  assert src in names, f"{f}: связь из несуществующего узла {src}"
+                  for outs in c["main"]:
+                      for t in outs:
+                          assert t["node"] in names, f"{f}: связь в несуществующий узел {t['node']}"
+              print("ok", f)
+          PY
+          bash -n n8n/server/deploy.sh
+
+  deploy:
+    needs: check
+    runs-on: ubuntu-latest
+    environment: n8n
+    steps:
+      - uses: actions/checkout@v4
+      - name: Скрипт обновления
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.N8N_SSH_HOST }}
+          username: ${{ secrets.N8N_SSH_USER }}
+          key: ${{ secrets.N8N_SSH_KEY }}
+          port: ${{ secrets.N8N_SSH_PORT || 22 }}
+          source: "n8n/server/deploy.sh"
+          target: "n8n-energy"
+          strip_components: 2
+      - name: Сценарии
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.N8N_SSH_HOST }}
+          username: ${{ secrets.N8N_SSH_USER }}
+          key: ${{ secrets.N8N_SSH_KEY }}
+          port: ${{ secrets.N8N_SSH_PORT || 22 }}
+          source: "n8n/workflows/*.json"
+          target: "n8n-energy"
+          strip_components: 1
+          rm: false
+      - name: Импорт в n8n
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.N8N_SSH_HOST }}
+          username: ${{ secrets.N8N_SSH_USER }}
+          key: ${{ secrets.N8N_SSH_KEY }}
+          port: ${{ secrets.N8N_SSH_PORT || 22 }}
+          script: |
+            cd ~/n8n-energy
+            rm -f workflows/*.json.bak
+            bash deploy.sh
