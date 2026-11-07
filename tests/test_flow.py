@@ -133,8 +133,17 @@ def test_full_flow(client, db):
     assert head.form(f"{page}/status", {"to": "held"}, page).status_code == 303
     before = {e.id: e.competence for e in experts}
     r = head.form(f"{page}/result", {"guests_count": "44", "tickets_sold": "45", "revenue": "36000",
-                                     "actual_cost": "9800", "avg_rating": "4.6", "finalize": "1"}, page)
+                                     "actual_cost": "9800"}, page)
+    assert r.status_code == 303 and "tab=review" in r.headers["location"]
+    review_page = head.get(f"{page}?tab=review").text
+    assert "План, прогноз и факт" in review_page and "Точность экспертов" in review_page
+    head.form(f"{page}/review", {"avg_rating": "", "finalize": "1"}, page)            # без оценки не завершить
+    db.expire_all()
+    assert db.get(m.Event, ev_id).status == "held"
+    r = head.form(f"{page}/review", {"avg_rating": "4,6", "lessons": "Больше времени на финал", "finalize": "1"},
+                  page)
     assert r.status_code == 303
+    head.form(f"{page}/review", {"avg_rating": "4,6", "finalize": "1"}, page)          # повтор не дублирует
     db.expire_all()
     assert db.get(m.Event, ev_id).status == "analyzed"
     hist = db.scalars(select(m.CompetenceHistory).where(m.CompetenceHistory.event_id == ev_id)).all()

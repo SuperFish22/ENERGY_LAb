@@ -20,13 +20,12 @@
   <div class="grid-3">
     <div class="field"><label for="pg">Пришло гостей</label><input id="pg" type="number" min="1" name="guests_count" required value="{{ f.guests_count or '' }}"></div>
     <div class="field"><label for="pc">Мест в зале</label><input id="pc" type="number" min="1" name="capacity" value="{{ f.capacity or '' }}" placeholder="как у площадки"></div>
-    <div class="field"><label for="pr">Оценка гостей, 1–5</label><input id="pr" name="avg_rating" inputmode="decimal" value="{{ f.avg_rating or '' }}" placeholder="например, 4,6"></div>
     <div class="field"><label for="pp">Цена билета, ₽</label><input id="pp" name="ticket_price" inputmode="decimal" value="{{ f.ticket_price or '0' }}"></div>
     <div class="field"><label for="pts">Продано билетов</label><input id="pts" type="number" min="0" name="tickets_sold" value="{{ f.tickets_sold or '' }}" placeholder="= гостей"></div>
     <div class="field"><label for="prv">Выручка, ₽</label><input id="prv" name="revenue" inputmode="decimal" value="{{ f.revenue or '' }}" placeholder="цена × билеты"></div>
     <div class="field"><label for="pcs">Фактические затраты, ₽</label><input id="pcs" name="actual_cost" inputmode="decimal" value="{{ f.actual_cost or '' }}"></div>
   </div>
-  <p class="small muted">Затраты и число гостей нужны калькулятору стоимости: из них считаются материалы на гостя для этого формата.</p>
+  <p class="small muted">Затраты и число гостей нужны калькулятору стоимости: из них считаются материалы на гостя для этого формата. Оценку гостей и выводы вы поставите следующим шагом — во вкладке «Итоговая оценка».</p>
 
   <h2 style="margin-top:1.5rem">Фотоальбом</h2>
   <div class="field"><label for="pph">Фото (можно сразу несколько, первое станет обложкой)</label><input id="pph" type="file" name="files" accept="image/jpeg,image/png,image/webp" multiple></div>

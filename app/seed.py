@@ -4,7 +4,7 @@
         python -m app.seed --demo     — плюс демонстрационные проекты (ДЕМО-цифры, заменить реальными)
 """
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -168,7 +168,8 @@ def seed_demo(db: Session) -> None:
         db.add(ev)
         db.flush()
         db.add(m.EventResult(event_id=ev.id, guests_count=guests, tickets_sold=sold, revenue=price * sold,
-                             actual_cost=fact, avg_rating=rating))
+                             actual_cost=fact, avg_rating=rating, reviewed_at=datetime.combine(d, time(23, 0)),
+                             lessons="ДЕМО: замените реальными выводами разбора полёта."))
         db.add(m.Forecast(event_id=ev.id, expert_score=round(rating - 0.3, 2), recommendation="Утвердить"))
         pal = DEMO_ART[int(code[-2:]) % len(DEMO_ART)]
         for k in range(3):

@@ -1,4 +1,5 @@
 {
+  "id": "elabNotifyOutbox",
   "name": "Energy Lab — доставка уведомлений",
   "nodes": [
     {
@@ -32,7 +33,7 @@
       ],
       "parameters": {
         "method": "GET",
-        "url": "={{ $env.LAB_URL }}/api/bot/notifications",
+        "url": "=https://lab.energy-academia.duckdns.org/api/bot/notifications",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {
@@ -177,7 +178,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.LAB_URL }}/api/bot/notifications/{{ $json.id }}/sent",
+        "url": "=https://lab.energy-academia.duckdns.org/api/bot/notifications/{{ $json.id }}/sent",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {

@@ -129,17 +129,21 @@ def test_past_event_quick_form(client, db):
     assert head.get(page).status_code == 200
     fmt = db.scalar(select(m.EventFormat).where(m.EventFormat.code == "42"))
     data = {"csrf_token": head.csrf(page), "title": "Хэллоуин в ENERGY", "format_id": str(fmt.id),
-            "planned_date": "2026-10-31", "guests_count": "48", "ticket_price": "600", "actual_cost": "7200",
-            "avg_rating": "4,8"}
+            "planned_date": "2026-10-31", "guests_count": "48", "ticket_price": "600", "actual_cost": "7200"}
     r = head.post(page, data=data | {"planned_date": "2099-01-01"}, follow_redirects=False)
     assert r.headers["location"] == page                                            # дата в будущем
     r = head.post(page, data=data | {"csrf_token": head.csrf(page)},
                   files=[("files", ("a.png", io.BytesIO(PNG), "image/png"))], follow_redirects=False)
-    assert r.status_code == 303 and "tab=photos" in r.headers["location"]
+    assert r.status_code == 303 and "tab=review" in r.headers["location"]
     db.expire_all()
     ev = db.scalar(select(m.Event).where(m.Event.title == "Хэллоуин в ENERGY"))
     assert ev.status == "analyzed" and ev.result.guests_count == 48 and float(ev.result.revenue) == 600 * 48
-    assert ev.result.avg_rating == 4.8 and ev.cover
+    assert ev.cover and ev.result.avg_rating is None
+    assert "План, прогноз и факт" in head.get(f"/cabinet/projects/{ev.id}?tab=review").text
+    head.form(f"/cabinet/projects/{ev.id}/review", {"avg_rating": "4,8", "finalize": "1"}, page)
+    db.expire_all()
+    ev = db.get(m.Event, ev.id)
+    assert ev.result.avg_rating == 4.8 and ev.result.reviewed_at
     assert "Хэллоуин в ENERGY" in client.get("/").text and "Хэллоуин в ENERGY" in client.get("/archive").text
     member = Client(app).__enter__().login("member@energy.local")
     assert member.get(page).status_code == 403

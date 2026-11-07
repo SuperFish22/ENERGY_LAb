@@ -1,0 +1,20 @@
+# n8n на внешнем сервере (energysup.duckdns.org). HTTPS даёт nginx этого сервера (sites-enabled/energysup.conf),
+# поэтому n8n слушает только 127.0.0.1:5678 — напрямую из интернета он недоступен.
+# Данные — в существующем томе n8n_data (сценарии, учётные данные, ключ шифрования в /home/node/.n8n/config).
+# Запуск: cd ~/n8n && docker compose up -d   (рядом файл .env с переменными из старого контейнера)
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:${N8N_VERSION:-2.42.3}
+    container_name: n8n
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      GENERIC_TIMEZONE: Europe/Moscow
+      TZ: Europe/Moscow
+      EXECUTIONS_DATA_PRUNE: "true"     # ЧТЗ-5: история выполнений не дольше 24 ч,
+      EXECUTIONS_DATA_MAX_AGE: "24"     # чтобы тексты и Telegram ID не копились вне РФ
+    ports: ["127.0.0.1:5678:5678"]
+    volumes: ["n8n_data:/home/node/.n8n"]
+volumes:
+  n8n_data:
+    external: true

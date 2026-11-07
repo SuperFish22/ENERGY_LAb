@@ -15,7 +15,7 @@ from app import models as m
 from app.config import settings
 from app.db import get_db
 from app.deps import csrf, current_user, flash, render
-from app.expertise import service
+from app.expertise import review, service
 from app.notify import notify, notify_heads
 from app.security import audit
 
@@ -138,11 +138,10 @@ async def past_create(request: Request, db: Session = Depends(get_db), user: m.U
         errors.append("Дата должна быть сегодня или в прошлом")
     if guests is None or guests < 1:
         errors.append("Сколько пришло гостей?")
-    rating = _num(g("avg_rating"), None, 1, 5) if g("avg_rating") else None
     if errors:
         request.session["past_form"] = {k: g(k) for k in ("title", "format_id", "planned_date", "start_time",
                                                            "venue_id", "capacity", "ticket_price", "guests_count",
-                                                           "tickets_sold", "revenue", "actual_cost", "avg_rating",
+                                                           "tickets_sold", "revenue", "actual_cost",
                                                            "age_rating", "description")}
         flash(request, ". ".join(errors), "error")
         return RedirectResponse("/cabinet/archive/new", 303)
@@ -159,7 +158,7 @@ async def past_create(request: Request, db: Session = Depends(get_db), user: m.U
     db.add(ev)
     db.flush()
     db.add(m.EventResult(event_id=ev.id, guests_count=int(guests), tickets_sold=sold,
-                         revenue=_num(g("revenue"), price * sold), actual_cost=cost, avg_rating=rating))
+                         revenue=_num(g("revenue"), price * sold), actual_cost=cost))
     added = skipped = 0
     for upload in form.getlist("files"):
         if not getattr(upload, "filename", ""):
@@ -172,11 +171,12 @@ async def past_create(request: Request, db: Session = Depends(get_db), user: m.U
             skipped += 1
     audit(db, user.id, "past_event", "event", ev.code)
     db.commit()
-    msg = f"{ev.code} «{ev.title}» добавлено в альбом прошедших тусовок. Фото: {added}"
+    msg = (f"{ev.code} «{ev.title}» добавлено в альбом прошедших тусовок. Фото: {added}. "
+           "Осталось поставить оценку гостей во вкладке «Итоговая оценка»")
     if skipped:
         msg += f". Пропущено {skipped}: нужны JPG, PNG или WebP до 8 МБ"
     flash(request, msg, "warn" if skipped else "ok")
-    return RedirectResponse(f"/cabinet/projects/{ev.id}?tab=photos", 303)
+    return RedirectResponse(f"/cabinet/projects/{ev.id}?tab=review", 303)
 
 
 @router.get("/projects/new")
@@ -259,8 +259,9 @@ def project_view(event_id: int, request: Request, tab: str = "overview", db: Ses
     transitions = {k: v for k, v in m.TRANSITIONS.get(ev.status, {}).items()
                    if (v == "head" and user.has_role("head")) or (v == "author" and (ev.author_id == user.id
                                                                                    or user.has_role("head")))}
+    rv = review.build(db, ev) if tab == "review" and ev.status in ("held", "analyzed") else None
     return render(request, "cabinet/project.html", {
-        "user": user, "ev": ev, "tab": tab, "summ": summ, "fc": fc, "can_see_results": can_see_results,
+        "user": user, "ev": ev, "tab": tab, "summ": summ, "fc": fc, "can_see_results": can_see_results, "rv": rv,
         "experts": experts, "assigned": assigned, "tasks": tasks, "tickets": tickets, "feedbacks": fbs,
         "st_fb": st_fb, "decisions": decisions, "users": users, "my_round_open": my_round_open,
         "transitions": transitions, "statuses": m.EVENT_STATUSES, "departments": db.scalars(select(m.Department)).all(),
@@ -356,25 +357,59 @@ def station_edit(event_id: int, station_id: int, request: Request, action: str =
 # ------------------------------------------------------------------ факт и продажи
 @router.post("/projects/{event_id}/result", dependencies=[Depends(csrf)])
 def result_save(event_id: int, request: Request, guests_count: int = Form(...), tickets_sold: int = Form(...),
-                revenue: float = Form(...), actual_cost: float = Form(...), avg_rating: str = Form(""),
-                finalize: str = Form(""), db: Session = Depends(get_db), user: m.User = Depends(current_user)):
+                revenue: float = Form(...), actual_cost: float = Form(...),
+                db: Session = Depends(get_db), user: m.User = Depends(current_user)):
+    """Количественный факт (вкладка «Билеты и факт»). Оценка и завершение — во вкладке «Итоговая оценка»."""
     if not user.has_role("head"):
         raise HTTPException(403, "Факт вносит руководитель")
     ev = _event(db, event_id, user)
     res = ev.result or m.EventResult(event_id=ev.id)
     res.guests_count, res.tickets_sold, res.revenue, res.actual_cost = guests_count, tickets_sold, revenue, actual_cost
-    res.avg_rating = float(avg_rating.replace(",", ".")) if avg_rating.strip() else None
     db.add(res)
     db.commit()
-    msg = "Фактические показатели сохранены"
-    if finalize and ev.status == "held":
-        ev.status = "analyzed"
+    flash(request, "Фактические показатели сохранены. Следующий шаг — «Итоговая оценка»")
+    return RedirectResponse(f"/cabinet/projects/{ev.id}?tab=review", 303)
+
+
+@router.post("/projects/{event_id}/review", dependencies=[Depends(csrf)])
+def review_save(event_id: int, request: Request, avg_rating: str = Form(""), lessons: str = Form(""),
+                finalize: str = Form(""), db: Session = Depends(get_db), user: m.User = Depends(current_user)):
+    """Итоговая оценка: оценка гостей, выводы и завершение разбора полёта (статус «Проанализирован»,
+    пересчёт компетентности экспертов — один раз на мероприятие)."""
+    if not user.has_role("head"):
+        raise HTTPException(403, "Итоговую оценку проводит руководитель")
+    ev = _event(db, event_id, user)
+    page = f"/cabinet/projects/{ev.id}?tab=review"
+    if ev.status not in ("held", "analyzed"):
+        flash(request, "Итоговая оценка доступна после того, как мероприятие проведено", "error")
+        return RedirectResponse(page, 303)
+    if not ev.result:
+        flash(request, "Сначала внесите гостей, выручку и затраты во вкладке «Билеты и факт»", "error")
+        return RedirectResponse(f"/cabinet/projects/{ev.id}?tab=fact", 303)
+    rating = _num(avg_rating, None, 1, 5) if avg_rating.strip() else None
+    ev.result.avg_rating = rating
+    ev.result.lessons = lessons.strip()[:5000] or None
+    msg = "Итоговая оценка сохранена"
+    if finalize:
+        if rating is None:
+            db.commit()
+            flash(request, "Чтобы завершить разбор полёта, укажите оценку гостей", "error")
+            return RedirectResponse(page, 303)
+        ev.result.reviewed_at = datetime.now()
+        if ev.status == "held":
+            ev.status = "analyzed"
+        audit(db, user.id, "final_review", "event", ev.code)
         db.commit()
         db.refresh(ev)
-        changes = service.update_competence(db, ev)
-        msg += f". Разбор полёта завершён, компетентность обновлена у {len(changes)} экспертов"
+        already = db.scalar(select(m.CompetenceHistory).where(m.CompetenceHistory.event_id == ev.id))
+        changes = [] if already else service.update_competence(db, ev)
+        msg = "Разбор полёта завершён. Мероприятие учтено в прогнозах"
+        if changes:
+            msg += f", компетентность обновлена у {len(changes)} экспертов"
+    else:
+        db.commit()
     flash(request, msg)
-    return RedirectResponse(f"/cabinet/projects/{ev.id}?tab=fact", 303)
+    return RedirectResponse(page, 303)
 
 
 # ------------------------------------------------------------------ выгрузка (М-09)

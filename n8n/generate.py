@@ -1,10 +1,14 @@
 """Генератор шаблонов сценариев n8n для Energy Lab. Запуск: python gen_n8n.py <папка>"""
 import json
+import os
 import sys
 import uuid
 from pathlib import Path
 
 OUT = Path(sys.argv[1])
+# Адрес сайта подставляется прямо в сценарии: в n8n 2.x доступ узлов к переменным окружения закрыт по умолчанию,
+# и открывать его ради одного адреса незачем (переменные n8n могут содержать секреты).
+LAB_URL = os.environ.get("LAB_URL", "https://lab.energy-academia.duckdns.org").rstrip("/")
 API = "={{ $env.LAB_URL }}/api/bot"
 CRED_LAB = {"httpHeaderAuth": {"id": "", "name": "Energy Lab Bot API"}}
 CRED_TG = {"telegramApi": {"id": "", "name": "Telegram ENERGY bot"}}
@@ -34,6 +38,12 @@ def http(name, method, path, pos, body=None, query=None):
 
 def code(name, js, pos):
     return node(name, "n8n-nodes-base.code", {"jsCode": js}, pos, 2)
+
+
+# Постоянные ID: повторный импорт (n8n import:workflow) обновляет сценарий, а не создаёт копию.
+WF_IDS = {"telegram-bot.json": "elabTelegramBot1", "notifications-outbox.json": "elabNotifyOutbox",
+          "vk-bot-inbound.json": "elabVkInbound001", "google-sheets-registry.json": "elabGSheetRegist",
+          "google-docs-from-template.json": "elabGDocTemplate"}
 
 
 def wf(name, nodes, conns, tags):
@@ -293,5 +303,7 @@ d = wf("Energy Lab — документ из шаблона Google Docs", d_node
 OUT.mkdir(parents=True, exist_ok=True)
 for fname, obj in (("telegram-bot.json", bot), ("notifications-outbox.json", notes), ("vk-bot-inbound.json", vk),
                    ("google-sheets-registry.json", g), ("google-docs-from-template.json", d)):
-    (OUT / fname).write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
+    obj = {"id": WF_IDS[fname], **obj}
+    text = json.dumps(obj, ensure_ascii=False, indent=2).replace("{{ $env.LAB_URL }}", LAB_URL)
+    (OUT / fname).write_text(text, encoding="utf-8")
     print(fname, len(obj["nodes"]), "узлов")

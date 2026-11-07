@@ -13,7 +13,7 @@
   </div>
 </header>
 {% include "partials/tracker.html" %}
-{% set tabs = [('overview','Обзор'),('stations','Станции'),('expertise','Экспертиза'),('forecast','Прогноз и решение'),('tasks','Задачи'),('fact','Билеты и факт'),('photos','Фотоальбом')] %}
+{% set tabs = [('overview','Обзор'),('stations','Станции'),('expertise','Экспертиза'),('forecast','Прогноз и решение'),('tasks','Задачи'),('fact','Билеты и факт'),('review','Итоговая оценка'),('photos','Фотоальбом')] %}
 <nav class="tabs" aria-label="Разделы проекта">{% for k,t in tabs %}<a href="?tab={{ k }}" {% if tab == k %}aria-current="page"{% endif %}>{{ t }}</a>{% endfor %}{% if can_edit %}<a href="?tab=edit" {% if tab == 'edit' %}aria-current="page"{% endif %}>Изменить</a>{% endif %}</nav>
 
 {% if tab == 'overview' %}
@@ -143,11 +143,93 @@
       <div class="field"><label for="ts">Продано билетов</label><input id="ts" name="tickets_sold" type="number" min="0" required value="{{ r.tickets_sold if r else paid|length }}"></div>
       <div class="field"><label for="rv">Выручка, ₽</label><input id="rv" name="revenue" inputmode="decimal" required value="{{ r.revenue if r else paid|sum(attribute='price') }}"></div>
       <div class="field"><label for="ac">Фактические затраты, ₽</label><input id="ac" name="actual_cost" inputmode="decimal" required value="{{ r.actual_cost if r else '' }}"></div>
-      <div class="field"><label for="ar">Средняя оценка гостей</label><input id="ar" name="avg_rating" inputmode="decimal" value="{{ r.avg_rating if r and r.avg_rating else ((feedbacks|sum(attribute='rating') / feedbacks|length)|round(2) if feedbacks else '') }}"></div>
     </div>
-    <div class="row-actions"><button class="btn">Сохранить</button>{% if ev.status == 'held' %}<button class="btn btn-launch" name="finalize" value="1">Зафиксировать и завершить разбор полёта</button>{% endif %}</div>
+    <div class="row-actions"><button class="btn btn-launch">Сохранить и перейти к итоговой оценке</button></div>
   </form>{% endif %}
 </div></div>
+
+{% elif tab == 'review' %}
+{% if not rv %}
+<section class="panel"><h2>Итоговая оценка</h2>
+  <p class="muted">Последний этап планирования: после мероприятия здесь сравниваются план, прогноз и факт, собирается голос гостей и проверяется точность экспертов. Вкладка откроется, когда мероприятие будет отмечено как проведённое.</p>
+  <ol class="review-steps"><li class="{{ 'done' if ev.status in ('held','analyzed') else '' }}">Мероприятие проведено</li><li>Внесён факт: гости, выручка, затраты</li><li>Собраны анкеты гостей</li><li>Оценка и выводы — разбор полёта завершён</li></ol>
+</section>
+{% else %}
+{% set r = ev.result %}
+<ol class="review-steps">
+  <li class="done">Мероприятие проведено</li>
+  <li class="{{ 'done' if r else 'now' }}">{% if r %}Факт внесён{% else %}<a href="?tab=fact">Внести факт</a>{% endif %}</li>
+  <li class="{{ 'done' if rv.feedback.n else ('now' if r else '') }}">Анкеты гостей: {{ rv.feedback.n }}</li>
+  <li class="{{ 'done' if rv.done else ('now' if r else '') }}">{{ 'Разбор полёта завершён' if rv.done else 'Оценка и выводы' }}</li>
+</ol>
+
+<div class="cols-2"><div>
+<section class="panel"><h2>План, прогноз и факт</h2>
+  {% if not rv.fc %}<p class="muted small">Для этого мероприятия прогноз не считался{% if not rv.has_expertise %} (оно внесено в архив без экспертизы){% endif %} — показан только план и факт.</p>{% endif %}
+  <div class="table-wrap"><table class="review-table">
+    <thead><tr><th>Показатель</th><th class="num">План</th><th class="num">Прогноз</th><th class="num">Факт</th><th class="num">Факт к прогнозу</th></tr></thead>
+    <tbody>{% for row in rv.rows %}<tr>
+      <td>{{ row.metric }}</td>
+      <td class="num">{% if row.plan is not none %}{{ row.plan|money if row.unit == '₽' else row.plan|num(0) }}{% else %}—{% endif %}</td>
+      <td class="num">{% if row.forecast is not none %}{{ row.forecast|money if row.unit == '₽' else row.forecast|num(1 if row.unit == 'из 5' else 0) }}{% else %}—{% endif %}</td>
+      <td class="num"><b>{% if row.fact is not none %}{{ row.fact|money if row.unit == '₽' else row.fact|num(1 if row.unit == 'из 5' else 0) }}{% else %}—{% endif %}</b></td>
+      <td class="num">{% if row.deviation is not none %}<span class="dev dev-{{ row.tone }}">{{ '+' if row.deviation > 0 else '' }}{{ (row.deviation*100)|round|int }}%</span>{% else %}—{% endif %}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  <dl class="kpi" style="margin-top:1rem">
+    <div><b>{{ rv.accuracy|round|int ~ '%' if rv.accuracy is not none else '—' }}</b><span>точность прогноза</span></div>
+    <div><b>{{ ('да' if rv.in_range else 'нет') if rv.in_range is not none else '—' }}</b><span>явка в прогнозном диапазоне{% if rv.fc and rv.fc.attendance_low is not none %} {{ rv.fc.attendance_low }}–{{ rv.fc.attendance_high }}{% endif %}</span></div>
+  </dl>
+  <p class="small muted">Точность = 100 % минус средняя ошибка прогноза по гостям, билетам, выручке и затратам. Зелёным — отклонение в лучшую сторону, красным — в худшую, больше 10 %.</p>
+</section>
+
+{% if rv.stations %}
+<section class="panel"><h2>Станции: эксперты и гости</h2>
+  <div class="table-wrap"><table><thead><tr><th>Станция</th><th class="num">Эксперты</th><th class="num">Риск</th><th class="num">Гости</th><th class="num">Разница</th></tr></thead>
+  <tbody>{% for s in rv.stations %}<tr><td>{{ s.station.title }}</td><td class="num">{{ s.S|num(2) if s.S is not none else '—' }}</td>
+    <td class="num">{% if s.zone %}<span class="zone zone-{{ s.zone }}">{{ s.R|num(0) }}</span>{% else %}—{% endif %}</td>
+    <td class="num">{{ s.guests|num(2) if s.guests is not none else '—' }}{% if s.n %} <span class="muted small">({{ s.n }})</span>{% endif %}</td>
+    <td class="num">{% if s.gap is not none %}<span class="dev dev-{{ 'ok' if s.gap|abs < 0.5 else ('good' if s.gap > 0 else 'bad') }}">{{ '+' if s.gap > 0 else '' }}{{ s.gap|num(2) }}</span>{% else %}—{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+  <p class="small muted">Разница больше 0,5 балла — повод обсудить станцию: эксперты переоценили (красный) или недооценили (зелёный) её для гостей.</p>
+</section>
+{% endif %}
+</div><div>
+
+<section class="panel"><h2>Голос гостей</h2>
+  {% if rv.feedback.n %}
+  <dl class="kpi"><div><b>{{ rv.feedback.avg|num(2) }}</b><span>средняя оценка, анкет {{ rv.feedback.n }}</span></div><div><b>{{ rv.feedback.nps|round|int if rv.feedback.nps is not none else '—' }}</b><span>NPS (готовность рекомендовать)</span></div></dl>
+  <ul class="dist">{% for k, v in rv.feedback.dist.items() %}<li><span>{{ k }}★</span><i style="width: {{ (v / rv.feedback.n * 100)|round(1) }}%"></i><b>{{ v }}</b></li>{% endfor %}</ul>
+  {% for f in rv.feedback.comments %}<div class="msg">{{ f.rating }}/5 — {{ f.comment }}</div>{% endfor %}
+  {% else %}<p class="muted">Анкет пока нет. Ссылка для QR-кода: <code>/e/{{ ev.code }}/feedback</code> — анкета открыта 7 дней после мероприятия. Если оценку собирали иначе, впишите её ниже вручную.</p>{% endif %}
+</section>
+
+{% if rv.experts %}
+<section class="panel"><h2>Точность экспертов</h2>
+  <div class="table-wrap"><table><thead><tr><th>Эксперт</th><th class="num">Оценка проекта</th><th class="num">Точность</th><th class="num">Компетентность</th></tr></thead>
+  <tbody>{% for e in rv.experts %}<tr><td>{{ e.expert.user.full_name }} <span class="muted small">{{ e.expert.department.name }}</span></td><td class="num">{{ e.S_e|num(2) }}</td><td class="num">{{ (e.acc*100)|round|int }}%</td>
+    <td class="num">{{ e.old|num(3) }} → <b>{{ e.new|num(3) }}</b>{% if not e.applied %} <span class="muted small">после завершения</span>{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+  <p class="small muted">Точность = 1 − |оценка эксперта − оценка гостей| / 4. Компетентность обновляется по формуле c = 0,8·c + 0,2·точность и влияет на вес голоса эксперта в следующих проектах.</p>
+</section>
+{% endif %}
+
+{% if user.has_role('head') %}
+<form method="post" action="/cabinet/projects/{{ ev.id }}/review" class="panel">
+  <h2>{{ 'Итоговая оценка' if not rv.done else 'Итоговая оценка (завершена)' }}</h2>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <div class="field"><label for="rva">Оценка гостей, 1–5</label><input id="rva" name="avg_rating" inputmode="decimal" style="max-width:10rem" value="{{ (r.avg_rating if r and r.avg_rating is not none else (rv.feedback.avg|round(2) if rv.feedback.avg else ''))|string|replace('.', ',') }}">
+    <span class="small muted">{% if rv.feedback.n %}Подставлено из {{ rv.feedback.n }} анкет — можно поправить.{% else %}Анкет нет — впишите по отзывам или опросу.{% endif %}</span></div>
+  <div class="field"><label for="rvl">Выводы для следующих проектов</label><textarea id="rvl" name="lessons" rows="5" maxlength="5000" placeholder="Что сработало, что поменять, что повторить">{{ r.lessons if r and r.lessons else '' }}</textarea></div>
+  <div class="row-actions">
+    <button class="btn">Сохранить</button>
+    {% if not rv.done %}<button class="btn btn-launch" name="finalize" value="1" {% if not r %}disabled{% endif %}>Завершить разбор полёта</button>{% endif %}
+  </div>
+  {% if not rv.done %}<p class="small muted">После завершения мероприятие получит статус «Проанализирован», попадёт в базу аналогов для прогноза и калькулятор стоимости, а компетентность экспертов пересчитается — один раз.</p>{% else %}<p class="small muted">Завершено {{ r.reviewed_at|ru_date }}. Оценку и выводы можно уточнить; компетентность повторно не пересчитывается.</p>{% endif %}
+</form>
+{% elif r and r.lessons %}
+<section class="panel"><h2>Выводы</h2><p>{{ r.lessons }}</p></section>
+{% endif %}
+</div></div>
+{% endif %}
 
 {% elif tab == 'photos' %}
 <section class="panel"><h2>Фотоальбом</h2>

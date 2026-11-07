@@ -232,3 +232,22 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .fs { border: 1px solid var(--orbit); border-radius: var(--radius-m); padding: 1rem; margin: 0 0 1rem; }
 .fs legend { color: var(--mist); padding: 0 .4rem; }
 @media (max-width: 700px) { .team-row { grid-template-columns: 1fr; } }
+
+/* ---------- итоговая оценка ---------- */
+.review-steps { list-style: none; counter-reset: rs; margin: 0 0 1.25rem; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.review-steps li { counter-increment: rs; display: flex; gap: .6rem; align-items: center; padding: .7rem .9rem; border-radius: var(--radius-m);
+  border: 1px solid var(--orbit); color: var(--mist); font-size: .92rem; }
+.review-steps li::before { content: counter(rs); flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+  border: 2px solid var(--orbit); font-weight: 600; font-size: .8rem; }
+.review-steps li.done { color: var(--star); border-color: #4fd1a166; }
+.review-steps li.done::before { content: "✓"; border-color: var(--aurora); color: var(--aurora); }
+.review-steps li.now { color: var(--star); border-color: var(--flame); }
+.review-steps li.now::before { border-color: var(--flame); color: var(--flame); }
+.dev { font-weight: 600; white-space: nowrap; }
+.dev-good { color: var(--aurora); } .dev-bad { color: var(--ignite); } .dev-ok { color: var(--mist); }
+.review-table td:first-child { white-space: nowrap; }
+.dist { list-style: none; margin: .8rem 0; padding: 0; display: grid; gap: 4px; }
+.dist li { display: grid; grid-template-columns: 2.2em 1fr 2em; gap: 8px; align-items: center; font-size: .85rem; color: var(--mist); }
+.dist i { display: block; height: 8px; min-width: 2px; border-radius: 4px; background: var(--flame); }
+.dist b { text-align: right; color: var(--star); font-weight: 500; }
+@media (max-width: 700px) { .review-steps { grid-template-columns: 1fr 1fr; } }

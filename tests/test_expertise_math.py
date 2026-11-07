@@ -79,3 +79,15 @@ def test_predict_uses_capacity_and_caps():
     assert res["analogs"][0]["title"] == "A"                 # ближе по формату и цене
     assert 0 < res["attendance"] <= 60
     assert res["revenue"] == pytest.approx(res["tickets_sold"] * 1000, rel=0.01)
+
+
+def test_review_metrics():
+    from app.expertise.review import Row, accuracy, nps
+    assert nps([10, 9, 8, 6, 3]) == (2 - 2) / 5 * 100
+    assert nps([]) is None
+    rows = [Row("Гости", "чел.", 60, 50, 55), Row("Затраты", "₽", 9000, 10000, 9000, better="less"),
+            Row("Оценка гостей", "из 5", None, 4.5, 4.0)]
+    assert abs(rows[0].deviation - 0.1) < 1e-9 and rows[0].tone == "good"
+    assert rows[1].tone == "good"                       # затраты ниже прогноза — хорошо
+    assert abs(accuracy(rows) - 90) < 1e-9              # оценка гостей в MAPE не входит
+    assert Row("x", "", None, None, 5).deviation is None

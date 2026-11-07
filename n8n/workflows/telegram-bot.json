@@ -1,4 +1,5 @@
 {
+  "id": "elabTelegramBot1",
   "name": "Energy Lab — Telegram-бот",
   "nodes": [
     {
@@ -164,7 +165,7 @@
       ],
       "parameters": {
         "method": "GET",
-        "url": "={{ $env.LAB_URL }}/api/bot/me",
+        "url": "=https://lab.energy-academia.duckdns.org/api/bot/me",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {
@@ -207,7 +208,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.LAB_URL }}/api/bot/link",
+        "url": "=https://lab.energy-academia.duckdns.org/api/bot/link",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {
@@ -240,7 +241,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.LAB_URL }}/api/bot/unlink",
+        "url": "=https://lab.energy-academia.duckdns.org/api/bot/unlink",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {
@@ -273,7 +274,7 @@
       ],
       "parameters": {
         "method": "GET",
-        "url": "={{ $env.LAB_URL }}/api/bot/tasks",
+        "url": "=https://lab.energy-academia.duckdns.org/api/bot/tasks",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {
@@ -316,7 +317,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.LAB_URL }}/api/bot/tasks/{{ $json.args.id }}/status",
+        "url": "=https://lab.energy-academia.duckdns.org/api/bot/tasks/{{ $json.args.id }}/status",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {
@@ -349,7 +350,7 @@
       ],
       "parameters": {
         "method": "GET",
-        "url": "={{ $env.LAB_URL }}/api/bot/departments",
+        "url": "=https://lab.energy-academia.duckdns.org/api/bot/departments",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {
@@ -379,7 +380,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.LAB_URL }}/api/bot/discussions",
+        "url": "=https://lab.energy-academia.duckdns.org/api/bot/discussions",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {
@@ -412,7 +413,7 @@
       ],
       "parameters": {
         "method": "GET",
-        "url": "={{ $env.LAB_URL }}/api/bot/discussions",
+        "url": "=https://lab.energy-academia.duckdns.org/api/bot/discussions",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {
@@ -455,7 +456,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.LAB_URL }}/api/bot/discussions/{{ $json.args.id }}/messages",
+        "url": "=https://lab.energy-academia.duckdns.org/api/bot/discussions/{{ $json.args.id }}/messages",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {
@@ -488,7 +489,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.LAB_URL }}/api/bot/questions",
+        "url": "=https://lab.energy-academia.duckdns.org/api/bot/questions",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {
@@ -521,7 +522,7 @@
       ],
       "parameters": {
         "method": "GET",
-        "url": "={{ $env.LAB_URL }}/api/bot/events",
+        "url": "=https://lab.energy-academia.duckdns.org/api/bot/events",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {
@@ -551,7 +552,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.LAB_URL }}/api/bot/sos",
+        "url": "=https://lab.energy-academia.duckdns.org/api/bot/sos",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {

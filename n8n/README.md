@@ -13,7 +13,28 @@ n8n вызывает её закрытый API `/api/bot/*` и забирает 
 
 Файлы собраны скриптом `generate.py` (`python n8n/generate.py n8n/workflows`) — правьте скрипт, а не JSON руками.
 
-## Установка
+## Сервер n8n
+
+`n8n/server/` — для внешнего сервера `energysup.duckdns.org`: `docker-compose.yml` для уже работающего n8n (порт только на 127.0.0.1, HTTPS даёт nginx сервера) и `deploy.sh`, который обновляет сценарии Energy Lab в контейнере `n8n`, не трогая остальные. Адрес сайта зашит в сценарии при сборке (`LAB_URL=… python n8n/generate.py n8n/workflows`).
+
+Обновление идёт через GitHub Actions (`.github/workflows/n8n.yml`): при изменении папки `n8n/` в `main`
+сценарий проверяет JSON, ждёт подтверждения в окружении `n8n`, копирует файлы в `~/n8n-energy` на сервер
+и запускает `deploy.sh`. Тот сохраняет то, что настроено в интерфейсе (учётные данные, включён ли сценарий),
+импортирует новые версии (постоянные ID — без копий) и перезапускает n8n.
+
+Учётные данные создаются в интерфейсе n8n один раз и должны называться **точно так**:
+
+| Имя | Тип | Значение |
+|---|---|---|
+| `Energy Lab Bot API` | Header Auth | имя `Authorization`, значение `Bearer <BOT_API_TOKEN из .env сайта>` |
+| `Telegram ENERGY bot` | Telegram API | токен от @BotFather |
+| `Google сервисный аккаунт` | Google API (Service Account) | когда будут шаблоны |
+| `Energy Lab → n8n` | Header Auth | секрет вебхука документов |
+
+После первой настройки включите сценарии «Telegram-бот» и «доставка уведомлений» в интерфейсе — дальше
+`deploy.sh` сохраняет их включёнными при каждом обновлении.
+
+## Ручная установка (без GitHub Actions)
 
 1. В n8n: **Workflows → Import from File** — по очереди все `.json`.
 2. **Credentials**:

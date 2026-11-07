@@ -313,6 +313,8 @@ class EventResult(Base):
     revenue: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     actual_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     avg_rating: Mapped[float | None] = mapped_column(Float)
+    lessons: Mapped[str | None] = mapped_column(Text)                # выводы для следующих проектов
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime)   # когда завершена итоговая оценка
     event: Mapped[Event] = relationship(back_populates="result")
 
 
