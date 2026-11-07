@@ -9,8 +9,9 @@ TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 docker inspect "$C" >/dev/null 2>&1 || { echo "Контейнер $C не найден"; exit 1; }
 
 echo "1/4 Сохраняю текущее состояние сценариев и список учётных данных"
-docker exec "$C" sh -c 'rm -rf /tmp/elab && mkdir -p /tmp/elab/cur
-  n8n export:workflow --all --separate --output=/tmp/elab/cur >/dev/null 2>&1 || true
+# временная папка внутри контейнера: создаём от root и отдаём пользователю node, под которым работает n8n
+docker exec -u root "$C" sh -c 'rm -rf /tmp/elab && mkdir -p /tmp/elab/cur && chown -R node:node /tmp/elab'
+docker exec "$C" sh -c 'n8n export:workflow --all --separate --output=/tmp/elab/cur >/dev/null 2>&1 || true
   n8n export:credentials --all --output=/tmp/elab/creds.json >/dev/null 2>&1 || echo "[]" > /tmp/elab/creds.json'
 docker cp "$C:/tmp/elab/cur" "$TMP/cur" >/dev/null 2>&1 || mkdir -p "$TMP/cur"
 docker cp "$C:/tmp/elab/creds.json" "$TMP/creds.json" >/dev/null 2>&1 || echo "[]" > "$TMP/creds.json"
@@ -54,8 +55,9 @@ open(f"{tmp}/activate.txt", "w").write("\n".join(activate))
 PY
 
 echo "3/4 Импортирую"
-docker exec "$C" rm -rf /tmp/elab/new
+docker exec -u root "$C" rm -rf /tmp/elab/new
 docker cp "$TMP/new" "$C:/tmp/elab/new" >/dev/null
+docker exec -u root "$C" chown -R node:node /tmp/elab/new        # docker cp кладёт файлы от чужого пользователя
 docker exec "$C" n8n import:workflow --separate --input=/tmp/elab/new
 
 echo "4/4 Включаю сценарии, которые были включены, и перезапускаю n8n"
@@ -65,6 +67,6 @@ while read -r id; do
     || docker exec "$C" n8n update:workflow --id="$id" --active=true >/dev/null 2>&1 \
     || echo "   не удалось включить $id автоматически — включите в интерфейсе n8n"
 done < "$TMP/activate.txt"
-docker exec "$C" rm -rf /tmp/elab
+docker exec -u root "$C" rm -rf /tmp/elab
 docker restart "$C" >/dev/null
 echo "Готово"
