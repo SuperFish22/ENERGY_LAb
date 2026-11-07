@@ -3,11 +3,15 @@
 # Сам n8n уже работает на сервере (контейнер n8n); сюда копируются только сценарии и deploy.sh.
 # Нужны: окружение "n8n" (Settings → Environments, Required reviewers) и секреты
 # N8N_SSH_HOST, N8N_SSH_USER, N8N_SSH_KEY, N8N_SSH_PORT.
+
 name: n8n
+
 on:
   push:
     branches: [main]
-    paths: ["n8n/**", ".github/workflows/n8n.yml"]
+    paths: 
+      - "n8n/**"
+      - ".github/workflows/n8n.yml"
   workflow_dispatch:
 
 permissions:
@@ -17,28 +21,68 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: {python-version: "3.12"}
-      - name: Сценарии собраны из generate.py и корректны
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate workflows and deploy script
         run: |
+          # Генерация во временную папку и сравнение
           python n8n/generate.py /tmp/wf > /dev/null
-          diff -r /tmp/wf n8n/workflows || (echo "::error::workflows/*.json не совпадают с generate.py — запустите python n8n/generate.py n8n/workflows" && exit 1)
+          if ! diff -r /tmp/wf n8n/workflows; then
+            echo "::error::workflows/*.json не совпадают с generate.py — запустите python n8n/generate.py n8n/workflows"
+            exit 1
+          fi
+
+          # Валидация JSON структуры
           python - <<'PY'
-          import glob, json
+          import glob, json, sys
+          
           ids = set()
+          has_errors = False
+          
           for f in glob.glob("n8n/workflows/*.json"):
-              w = json.load(open(f, encoding="utf-8"))
-              names = {n["name"] for n in w["nodes"]}
-              assert w.get("id") and w["id"] not in ids, f"{f}: нет id или он повторяется"
-              ids.add(w["id"])
-              for src, c in w["connections"].items():
-                  assert src in names, f"{f}: связь из несуществующего узла {src}"
-                  for outs in c["main"]:
+              try:
+                  with open(f, encoding="utf-8") as file:
+                      w = json.load(file)
+              except Exception as e:
+                  print(f"::error file={f}::Ошибка парсинга JSON: {e}")
+                  has_errors = True
+                  continue
+
+              names = {n["name"] for n in w.get("nodes", [])}
+              
+              if not w.get("id"):
+                  print(f"::error file={f}::Отсутствует id workflow")
+                  has_errors = True
+              elif w["id"] in ids:
+                  print(f"::error file={f}::Дубликат id workflow")
+                  has_errors = True
+              else:
+                  ids.add(w["id"])
+
+              for src, c in w.get("connections", {}).items():
+                  if src not in names:
+                      print(f"::error file={f}::Связь из несуществующего узла {src}")
+                      has_errors = True
+                  for outs in c.get("main", []):
                       for t in outs:
-                          assert t["node"] in names, f"{f}: связь в несуществующий узел {t['node']}"
-              print("ok", f)
+                          if t["node"] not in names:
+                              print(f"::error file={f}::Связь в несуществующий узел {t['node']}")
+                              has_errors = True
+              
+              if not has_errors:
+                  print(f"ok {f}")
+                  
+          if has_errors:
+              sys.exit(1)
           PY
+
+          # Проверка синтаксиса bash-скрипта
           bash -n n8n/server/deploy.sh
 
   deploy:
@@ -46,8 +90,10 @@ jobs:
     runs-on: ubuntu-latest
     environment: n8n
     steps:
-      - uses: actions/checkout@v4
-      - name: Скрипт обновления
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Copy deploy script to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.N8N_SSH_HOST }}
@@ -57,7 +103,8 @@ jobs:
           source: "n8n/server/deploy.sh"
           target: "n8n-energy"
           strip_components: 2
-      - name: Сценарии
+
+      - name: Copy workflows to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.N8N_SSH_HOST }}
@@ -68,7 +115,8 @@ jobs:
           target: "n8n-energy"
           strip_components: 1
           rm: false
-      - name: Импорт в n8n
+
+      - name: Run deployment script via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.N8N_SSH_HOST }}
