@@ -19,6 +19,10 @@ def node(name, type_, params, pos, version=1, creds=None):
          "typeVersion": version, "position": pos, "parameters": params}
     if creds:
         n["credentials"] = creds
+    if type_ in ("n8n-nodes-base.telegramTrigger", "n8n-nodes-base.webhook"):
+        # Постоянный webhookId: адрес вебхука /webhook/<uuid>/... без имени узла (кириллица и «:» в имени
+        # дают адрес, на который n8n отвечает 404, и Telegram пишет «Wrong response from the webhook»)
+        n["webhookId"] = str(uuid.uuid5(uuid.NAMESPACE_URL, "energy-lab-webhook:" + name))
     return n
 
 

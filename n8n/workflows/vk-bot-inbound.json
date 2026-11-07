@@ -16,7 +16,8 @@
         "path": "energy-lab-vk",
         "responseMode": "responseNode",
         "options": {}
-      }
+      },
+      "webhookId": "273e7bb8-571a-584c-a5f0-048af4d4c7b1"
     },
     {
       "id": "72d322cf-6984-51a8-a78e-c6accfc68695",
