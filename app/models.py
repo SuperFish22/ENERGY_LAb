@@ -9,6 +9,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     SmallInteger,
@@ -44,13 +45,15 @@ TRANSITIONS = {
     "on_sale": {"held": "head"},
     "held": {"analyzed": "head"},
 }
-TASK_STATUSES = {"todo": "К выполнению", "in_progress": "В работе", "done": "Готово"}
+TASK_STATUSES = {"todo": "К выполнению", "in_progress": "В работе", "review": "На проверке", "done": "Выполнено"}
+TASK_PRIORITIES = {"normal": "Обычный", "high": "Высокий"}
 ROLE_NAMES = {
     "member": "Участник Lab",
     "expert": "Эксперт",
     "head": "Руководитель",
     "listener": "Слушатель",
     "master": "Мастер школы",
+    "support": "Поддержка",
 }
 
 
@@ -161,6 +164,8 @@ class Event(Base):
     status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
     planned_date: Mapped[date | None] = mapped_column(Date)
     start_time: Mapped[str | None] = mapped_column(String(5))
+    slot_min: Mapped[int | None] = mapped_column(SmallInteger)   # сколько минут есть на площадке (план тайминга)
+    album_url: Mapped[str | None] = mapped_column(String(500))    # полный фотоальбом на Яндекс/Google Диске
     age_rating: Mapped[str] = mapped_column(String(4), default="16+")
     ticket_price: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
     planned_budget: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
@@ -183,6 +188,32 @@ class Event(Base):
         cascade="all, delete-orphan", lazy="selectin")
 
     @property
+    def documents(self) -> list["Attachment"]:
+        from sqlalchemy import select
+        from sqlalchemy.orm import object_session
+        sess = object_session(self)
+        if not sess:
+            return []
+        return list(sess.scalars(select(Attachment).where(Attachment.event_id == self.id, Attachment.task_id.is_(None))
+                                 .order_by(Attachment.category, Attachment.id.desc())))
+
+    @property
+    def scenario(self):
+        """(строки сценария, общая длительность в минутах) — app/scenario.py."""
+        from app import scenario
+        return scenario.timeline(list(self.stations))
+
+    @property
+    def scenario_min(self) -> int:
+        return self.scenario[1]
+
+    @property
+    def rated_stations(self) -> list["Station"]:
+        """Блоки и станции, которые оценивают эксперты и гости (методы А–В, анкета, «эксперты vs гости»)."""
+        from app import scenario
+        return scenario.rated(list(self.stations))
+
+    @property
     def cover(self) -> "EventPhoto | None":
         return self.photos[0] if self.photos else None
 
@@ -196,6 +227,8 @@ class Event(Base):
 
 
 class Station(Base):
+    """Блок сценария (spec 002). Историческое имя таблицы — «stations»: раньше сценарий состоял только из станций.
+    Виды: block — блок программы, service — служебный, carousel — карусель станций, station — станция в карусели."""
     __tablename__ = "stations"
     id: Mapped[int] = mapped_column(primary_key=True)
     event_id: Mapped[int] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"))
@@ -205,6 +238,12 @@ class Station(Base):
     duration_min: Mapped[int] = mapped_column(SmallInteger, default=15)
     cost: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
     responsible_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    kind: Mapped[str] = mapped_column(String(10), default="block")
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("stations.id", ondelete="CASCADE"))  # карусель
+    rated: Mapped[bool] = mapped_column(Boolean, default=True)          # оценивают эксперты и гости
+    fact_min: Mapped[int | None] = mapped_column(SmallInteger)          # фактическая длительность
+    groups: Mapped[int | None] = mapped_column(SmallInteger)            # карусель: сколько групп
+    transition_min: Mapped[int | None] = mapped_column(SmallInteger)    # карусель: переход между станциями
     event: Mapped[Event] = relationship(back_populates="stations")
     responsible: Mapped[User | None] = relationship(lazy="selectin")
 
@@ -245,7 +284,7 @@ class Evaluation(Base):
     __tablename__ = "evaluations"
     __table_args__ = (
         UniqueConstraint("round_id", "expert_id", "criterion_id", "station_id", name="uq_evaluation"),
-        CheckConstraint("score BETWEEN 1 AND 5", name="ck_score"),
+        CheckConstraint("score BETWEEN 1 AND 10", name="ck_score"),
     )
     id: Mapped[int] = mapped_column(primary_key=True)
     round_id: Mapped[int] = mapped_column(ForeignKey("expertise_rounds.id", ondelete="CASCADE"))
@@ -262,7 +301,7 @@ class RiskAssessment(Base):
     __tablename__ = "risk_assessments"
     __table_args__ = (
         UniqueConstraint("round_id", "station_id", "expert_id", name="uq_risk"),
-        CheckConstraint("probability BETWEEN 1 AND 5 AND impact BETWEEN 1 AND 5", name="ck_risk"),
+        CheckConstraint("probability BETWEEN 1 AND 10 AND impact BETWEEN 1 AND 10", name="ck_risk"),
     )
     id: Mapped[int] = mapped_column(primary_key=True)
     round_id: Mapped[int] = mapped_column(ForeignKey("expertise_rounds.id", ondelete="CASCADE"))
@@ -280,6 +319,7 @@ class Forecast(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     expert_score: Mapped[float | None] = mapped_column(Float)
     kendall_w: Mapped[float | None] = mapped_column(Float)
+    variation: Mapped[float | None] = mapped_column(Float)          # коэффициент вариации оценок экспертов, %
     attendance: Mapped[int | None] = mapped_column(Integer)
     attendance_low: Mapped[int | None] = mapped_column(Integer)
     attendance_high: Mapped[int | None] = mapped_column(Integer)
@@ -332,7 +372,7 @@ class Ticket(Base):
 
 class Feedback(Base):
     __tablename__ = "feedback"
-    __table_args__ = (CheckConstraint("rating BETWEEN 1 AND 5", name="ck_fb_rating"),)
+    __table_args__ = (CheckConstraint("rating BETWEEN 1 AND 10", name="ck_fb_rating"),)
     id: Mapped[int] = mapped_column(primary_key=True)
     event_id: Mapped[int] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"), index=True)
     ticket_id: Mapped[int | None] = mapped_column(ForeignKey("tickets.id", ondelete="SET NULL"), unique=True)
@@ -365,13 +405,54 @@ class Task(Base):
     status: Mapped[str] = mapped_column(String(20), default="todo")
     due_date: Mapped[date | None] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    position: Mapped[int] = mapped_column(Integer, default=0)            # порядок в колонке доски, шаг 1000
+    priority: Mapped[str] = mapped_column(String(10), default="normal")  # normal / high
+    done_at: Mapped[datetime | None] = mapped_column(DateTime)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime)
     event: Mapped[Event | None] = relationship(lazy="selectin")
     department: Mapped[Department | None] = relationship(lazy="selectin")
     assignee: Mapped[User | None] = relationship(foreign_keys=[assignee_id], lazy="selectin")
 
+    author: Mapped[User | None] = relationship(foreign_keys=[author_id], lazy="selectin")
+    attachments: Mapped[list["Attachment"]] = relationship(lazy="selectin", order_by="Attachment.id",
+                                                          cascade="all, delete-orphan", passive_deletes=True)
+
     @property
     def status_name(self) -> str:
         return TASK_STATUSES.get(self.status, self.status)
+
+    @property
+    def days_overdue(self) -> int:
+        """Сколько дней просрочена (0 — не просрочена или выполнена)."""
+        if not self.due_date or self.status == "done":
+            return 0
+        return max(0, (date.today() - self.due_date).days)
+
+
+class TaskEvent(Base):
+    """История задачи: смена статуса, срока, исполнителя (ЧТЗ М06-19)."""
+    __tablename__ = "task_events"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    task_id: Mapped[int] = mapped_column(ForeignKey("tasks.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    field: Mapped[str] = mapped_column(String(20))
+    old_value: Mapped[str | None] = mapped_column(String(50))
+    new_value: Mapped[str | None] = mapped_column(String(50))
+    comment: Mapped[str | None] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(String(10), default="cabinet")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    user: Mapped[User | None] = relationship(lazy="selectin")
+
+
+class CalendarFeed(Base):
+    """Личная ссылка-подписка на календарь задач для Google и Яндекс Календаря (ЧТЗ М06-21)."""
+    __tablename__ = "calendar_feeds"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True)
+    token: Mapped[str] = mapped_column(String(64), unique=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    consent_at: Mapped[datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
 
 class Discussion(Base):
@@ -404,18 +485,73 @@ class Message(Base):
 
 
 class Question(Base):
-    """Вопросы для публичной доски и SOS (перенос прототипа ENERGY_board)."""
+    """Вопросы для публичной доски (перенос прототипа ENERGY_board)."""
     __tablename__ = "questions"
     id: Mapped[int] = mapped_column(primary_key=True)
     text: Mapped[str] = mapped_column(Text)
     category: Mapped[str] = mapped_column(String(30), default="Другое")
-    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending/approved/answered/rejected/sos
+    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending/approved/answered/rejected
     author_name: Mapped[str | None] = mapped_column(String(150))
     channel: Mapped[str] = mapped_column(String(10), default="web")
     channel_user_id: Mapped[str | None] = mapped_column(String(40))
     answer: Mapped[str | None] = mapped_column(Text)
     moderated_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
+class FaqItem(Base):
+    """Вопрос и ответ для раздела «Вопросы и ответы» на сайте и команды /faq в боте (spec 005)."""
+    __tablename__ = "faq"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    question: Mapped[str] = mapped_column(String(300))
+    answer: Mapped[str] = mapped_column(Text)
+    topic: Mapped[str] = mapped_column(String(40), default="Общие вопросы")
+    order_no: Mapped[int] = mapped_column(Integer, default=0)
+    is_published: Mapped[bool] = mapped_column(Boolean, default=True)
+    question_id: Mapped[int | None] = mapped_column(ForeignKey("questions.id", ondelete="SET NULL"))  # из доски
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+
+SUPPORT_STATUSES = {"open": "Ждёт ответа", "answered": "Отвечено", "closed": "Закрыт"}
+
+
+class SupportChat(Base):
+    """Переписка поддержки с внешним человеком (покупатель, гость), который пишет боту без привязки аккаунта."""
+    __tablename__ = "support_chats"
+    __table_args__ = (Index("ix_support_chats_peer", "channel", "chat_id"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    channel: Mapped[str] = mapped_column(String(10))                # telegram / vk
+    chat_id: Mapped[str] = mapped_column(String(40))
+    name: Mapped[str | None] = mapped_column(String(150))
+    status: Mapped[str] = mapped_column(String(10), default="open")
+    operator_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    operator: Mapped[User | None] = relationship(lazy="selectin")
+    messages: Mapped[list["SupportMessage"]] = relationship(back_populates="chat", cascade="all, delete-orphan",
+                                                            order_by="SupportMessage.id", lazy="selectin")
+
+    @property
+    def status_name(self) -> str:
+        return SUPPORT_STATUSES.get(self.status, self.status)
+
+    @property
+    def last(self) -> "SupportMessage | None":
+        return self.messages[-1] if self.messages else None
+
+
+class SupportMessage(Base):
+    __tablename__ = "support_messages"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    chat_id: Mapped[int] = mapped_column(ForeignKey("support_chats.id", ondelete="CASCADE"), index=True)
+    direction: Mapped[str] = mapped_column(String(3))                 # in — от человека, out — от оператора
+    text: Mapped[str] = mapped_column(Text)
+    author_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    source: Mapped[str] = mapped_column(String(10), default="web")    # откуда ответил оператор: web/telegram/vk
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    chat: Mapped[SupportChat] = relationship(back_populates="messages")
+    author: Mapped[User | None] = relationship(lazy="selectin")
 
 
 class LinkCode(Base):
@@ -435,8 +571,28 @@ class Notification(Base):
     chat_id: Mapped[str] = mapped_column(String(40))
     text: Mapped[str] = mapped_column(Text)
     link: Mapped[str | None] = mapped_column(String(255))
+    reply_markup: Mapped[str | None] = mapped_column(Text)        # кнопки под сообщением Telegram (JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+INBOX_KINDS = {"task": "Задачи", "project": "Проекты", "discussion": "Обсуждения", "request": "Заявки",
+               "support": "Поддержка", "system": "Система"}
+
+
+class InboxItem(Base):
+    """Уведомление на сайте (колокольчик в кабинете). Создаётся всегда, независимо от мессенджера."""
+    __tablename__ = "inbox"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(12), default="system")
+    text: Mapped[str] = mapped_column(Text)
+    link: Mapped[str | None] = mapped_column(String(255))           # путь на сайте, например /cabinet/tasks/5
+    task_id: Mapped[int | None] = mapped_column(ForeignKey("tasks.id", ondelete="SET NULL"))
+    actor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime)
+    actor: Mapped[User | None] = relationship(foreign_keys=[actor_id], lazy="selectin")
 
 
 class AuditLog(Base):
@@ -455,7 +611,8 @@ class PartyRequest(Base):
     __table_args__ = (CheckConstraint("guests BETWEEN 1 AND 1000", name="ck_pr_guests"),)
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(150))
-    contact: Mapped[str] = mapped_column(String(150))               # телефон, e-mail или ник в мессенджере
+    contact: Mapped[str] = mapped_column(String(150), default="")   # телефон или e-mail
+    telegram: Mapped[str | None] = mapped_column(String(32))        # ник в Telegram без «@» (ссылка https://t.me/ник)
     occasion: Mapped[str] = mapped_column(String(60))               # повод
     format_id: Mapped[int | None] = mapped_column(ForeignKey("event_formats.id", ondelete="SET NULL"))
     wish_date: Mapped[date | None] = mapped_column(Date)
@@ -471,8 +628,46 @@ class PartyRequest(Base):
     format: Mapped[EventFormat | None] = relationship(lazy="selectin")
     manager: Mapped[User | None] = relationship(lazy="selectin")
 
+    @property
+    def telegram_url(self) -> str | None:
+        return f"https://t.me/{self.telegram}" if self.telegram else None
+
 
 REQUEST_STATUSES = {"new": "Новая", "in_work": "В работе", "done": "Договорились", "rejected": "Отказ"}
+
+
+DOC_CATEGORIES = {"estimate": "Смета", "contract": "Договор", "scenario": "Сценарий", "rider": "Райдер",
+                  "presentation": "Презентация", "other": "Прочее"}
+LINK_PROVIDERS = {"yandex": "Яндекс Диск", "gdrive": "Google Диск", "gdocs": "Google Документ",
+                  "gsheets": "Google Таблица", "gslides": "Google Презентация", "gforms": "Google Форма"}
+
+
+class Attachment(Base):
+    """Документ проекта или вложение задачи: загруженный файл (FILES_DIR) или ссылка на Яндекс/Google Диск."""
+    __tablename__ = "attachments"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    event_id: Mapped[int | None] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"), index=True)
+    task_id: Mapped[int | None] = mapped_column(ForeignKey("tasks.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(5))                    # file / link
+    title: Mapped[str] = mapped_column(String(200))
+    category: Mapped[str] = mapped_column(String(15), default="other")
+    file: Mapped[str | None] = mapped_column(String(255))           # путь относительно FILES_DIR
+    original_name: Mapped[str | None] = mapped_column(String(200))
+    size: Mapped[int | None] = mapped_column(Integer)
+    url: Mapped[str | None] = mapped_column(String(500))
+    provider: Mapped[str | None] = mapped_column(String(10))
+    uploaded_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    uploader: Mapped[User | None] = relationship(lazy="selectin")
+
+    @property
+    def ext(self) -> str:
+        return (self.original_name or "").rsplit(".", 1)[-1].upper() if self.original_name and "." in \
+            self.original_name else ""
+
+    @property
+    def provider_name(self) -> str:
+        return LINK_PROVIDERS.get(self.provider or "", "Ссылка")
 
 
 class EventPhoto(Base):

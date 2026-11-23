@@ -1,35 +1,130 @@
 {% extends "base.html" %}
 {% block title %}{% block page_title %}Кабинет{% endblock %} — Energy Lab{% endblock %}
 {% block body %}
+{%- set here = request.url.path ~ ('?' ~ request.url.query if request.url.query else '') -%}
+{%- macro sub(href, label, exact=True) -%}
+  {%- set on = (here == href) if exact else here.startswith(href) -%}
+  <li><a href="{{ href }}" {% if on %}aria-current="page"{% endif %}>{{ label }}</a></li>
+{%- endmacro -%}
+{%- macro group(key, label) -%}
+  <details class="nav-item" {% if nav == key %}open{% endif %}>
+    <summary {% if nav == key %}class="is-current"{% endif %}>{{ label }}</summary>
+    <ul>{{ caller() }}</ul>
+  </details>
+{%- endmacro -%}
 <div class="cab">
   <aside class="side">
-    <a class="logo" href="/"><img class="logo-mark" src="/static/img/logo.svg" alt="">Energy Lab</a>
-    <nav aria-label="Кабинет" style="margin-top:1.5rem">
+    <div class="side-top">
+      <a class="logo" href="/"><img class="logo-img" src="/static/img/energy-logo.png?v={{ ASSET_V }}" alt="" width="53" height="40">Energy Lab</a>
+      <a class="bell{% if unread %} has-unread{% endif %}" href="/cabinet/notifications" data-bell
+         aria-label="Уведомления{% if unread %}: непрочитанных {{ unread }}{% endif %}" {% if nav == 'notifications' %}aria-current="page"{% endif %}>
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v3.6l-1.6 2.9A1 1 0 0 0 5.3 17h13.4a1 1 0 0 0 .9-1.5L18 12.6V9a6 6 0 0 0-6-6Zm-2.4 15.5a2.5 2.5 0 0 0 4.8 0" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="bell-count" data-bell-count {% if not unread %}hidden{% endif %}>{{ unread if unread < 100 else '99+' }}</span>
+      </a>
+    </div>
+    <details class="side-menu" id="side-menu" open>
+    <summary class="side-toggle">Меню</summary>
+    <nav aria-label="Кабинет" class="side-nav">
       <div class="group">Центр управления</div>
-      <a href="/cabinet" {% if nav == 'home' %}aria-current="page"{% endif %}>Обзор</a>
-      <a href="/cabinet/projects" {% if nav == 'projects' %}aria-current="page"{% endif %}>Проекты</a>
-      <a href="/cabinet/tasks" {% if nav == 'tasks' %}aria-current="page"{% endif %}>Задачи</a>
-      <a href="/cabinet/discussions" {% if nav == 'disc' %}aria-current="page"{% endif %}>Обсуждения</a>
+      <a class="nav-single" href="/cabinet" {% if nav == 'home' %}aria-current="page"{% endif %}>Обзор</a>
+      <a class="nav-single" href="/cabinet/notifications" {% if nav == 'notifications' %}aria-current="page"{% endif %}>Уведомления{% if unread %} <span class="nav-count">{{ unread }}</span>{% endif %}</a>
+
+      {% call group('projects', 'Проекты') %}
+        {{ sub('/cabinet/projects', 'Все проекты') }}
+        {% if user.has_role('member', 'head') %}{{ sub('/cabinet/projects?mine=1', 'Мои проекты') }}{% endif %}
+        {{ sub('/cabinet/projects?status=draft,rework', 'Черновики и доработка') }}
+        {{ sub('/cabinet/projects?status=approved,on_sale', 'Утверждены и в продаже') }}
+        {{ sub('/cabinet/projects?status=held,analyzed', 'Прошедшие') }}
+        {% if user.has_role('member', 'head') %}{{ sub('/cabinet/projects/new', '+ Новый проект') }}{% endif %}
+        {% if user.has_role('head') %}{{ sub('/cabinet/archive/new', '+ Прошедшая тусовка') }}{% endif %}
+      {% endcall %}
+
+      {% call group('tasks', 'Задачи') %}
+        {{ sub('/cabinet/tasks', 'Мои задачи') }}
+        {% if user.has_role('head') %}{{ sub('/cabinet/tasks?scope=all', 'Все задачи') }}{% endif %}
+      {% endcall %}
+
+      {% call group('evaluation', 'Оценка') %}
+        {{ sub('/cabinet/evaluation', 'Все на оценке') }}
+        {{ sub('/cabinet/evaluation?stage=expertise', 'Экспертиза') }}
+        {{ sub('/cabinet/evaluation?stage=decision', 'Прогноз и решение') }}
+        {{ sub('/cabinet/evaluation?stage=review', 'Итоговая оценка') }}
+        {{ sub('/cabinet/evaluation/how', 'Как считается оценка') }}
+      {% endcall %}
+
+      {% call group('disc', 'Обсуждения') %}
+        {% if user.expert %}{{ sub('/cabinet/discussions', 'Мой отдел') }}{% endif %}
+        {{ sub('/cabinet/discussions?dept=all', 'Все отделы') }}
+      {% endcall %}
+
+      {% if user.has_role('head', 'support') %}
+      <div class="group">Гости и покупатели</div>
+      {% call group('support', 'Поддержка' ~ (' <span class="nav-count">' ~ support_open ~ '</span>' if support_open else '')|safe) %}
+        {{ sub('/cabinet/support', 'Активные диалоги') }}
+        {{ sub('/cabinet/support?status=open', 'Ждут ответа') }}
+        {{ sub('/cabinet/support?status=closed', 'Закрытые') }}
+      {% endcall %}
+
+      {% call group('faq', 'Вопросы и ответы') %}
+        {{ sub('/cabinet/admin/faq', 'FAQ') }}
+        {{ sub('/cabinet/admin/faq#new', '+ Новый вопрос') }}
+        {{ sub('/cabinet/admin/questions?status=pending', 'Доска: на проверке') }}
+        {{ sub('/cabinet/admin/questions', 'Доска: все вопросы') }}
+        <li><a href="/faq" target="_blank" rel="noopener">Открыть на сайте</a></li>
+      {% endcall %}
+      {% endif %}
+
       {% if user.has_role('head') %}
       <div class="group">Руководителю</div>
-      <a href="/cabinet/requests" {% if nav == 'requests' %}aria-current="page"{% endif %}>Заявки на тусовки</a>
-      <a href="/cabinet/admin/site" {% if nav == 'site' %}aria-current="page"{% endif %}>Главная страница</a>
-      <a href="/cabinet/admin/questions" {% if nav == 'questions' %}aria-current="page"{% endif %}>Доска и SOS</a>
-      <a href="/cabinet/admin/users" {% if nav == 'users' %}aria-current="page"{% endif %}>Экипаж</a>
-      <a href="/cabinet/admin/criteria" {% if nav == 'criteria' %}aria-current="page"{% endif %}>Критерии и площадки</a>
-      <a href="/cabinet/registry.csv">Реестр (CSV)</a>
+      {% call group('requests', 'Заявки на мероприятия') %}
+        {{ sub('/cabinet/requests', 'Все заявки') }}
+        {% for k, v in REQUEST_STATUSES.items() %}{{ sub('/cabinet/requests?status=' ~ k, v) }}{% endfor %}
+      {% endcall %}
+
+      {% call group('site', 'Главная страница') %}
+        {{ sub('/cabinet/admin/site#team', 'Команда в слайдере') }}
+        {{ sub('/cabinet/admin/site#texts', 'Тексты') }}
+        {{ sub('/cabinet/admin/site#socials', 'Соцсети') }}
+        {{ sub('/cabinet/admin/site#pricing', 'Калькулятор стоимости') }}
+        <li><a href="/" target="_blank" rel="noopener">Открыть сайт</a></li>
+        <li><a href="/archive" target="_blank" rel="noopener">Архив тусовок на сайте</a></li>
+      {% endcall %}
+
+      {% call group('users', 'Состав') %}
+        {{ sub('/cabinet/admin/users#crew', 'Участники и роли') }}
+        {{ sub('/cabinet/admin/users#invite', 'Пригласить') }}
+      {% endcall %}
+
+      {% call group('criteria', 'Методика') %}
+        {{ sub('/cabinet/admin/criteria#criteria', 'Критерии и веса') }}
+        {{ sub('/cabinet/admin/criteria#venues', 'Площадки') }}
+      {% endcall %}
+
+      <details class="nav-item">
+        <summary>Выгрузки</summary>
+        <ul><li><a href="/cabinet/registry.csv">Реестр мероприятий (CSV)</a></li></ul>
+      </details>
       {% endif %}
-      <a href="/cabinet/profile" {% if nav == 'profile' %}aria-current="page"{% endif %}>Профиль и бот</a>
+
+      <div class="group">Личное</div>
+      {% call group('profile', 'Профиль') %}
+        {{ sub('/cabinet/profile#data', 'Мои данные') }}
+        {{ sub('/cabinet/profile#bot', 'Бот и уведомления') }}
+      {% endcall %}
     </nav>
     <div class="me">
       <div>{{ user.full_name }}</div>
       <div class="muted small">{% for r in user.role_codes %}{{ ROLE_NAMES[r] }}{% if not loop.last %}, {% endif %}{% endfor %}{% if user.expert %} · {{ user.expert.department.name }}{% endif %}</div>
       <form method="post" action="/logout" style="margin-top:.6rem"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn-link">Выйти</button></form>
     </div>
+    </details>
+    <script>if (matchMedia("(max-width: 900px)").matches) document.getElementById("side-menu").removeAttribute("open");</script>
   </aside>
   <main class="main">
     {% include "partials/flash.html" %}
     {% block main %}{% endblock %}
   </main>
+  <div class="toasts" data-toasts role="status" aria-live="polite"></div>
+  <script src="/static/js/notify.js?v={{ ASSET_V }}" defer></script>
 </div>
 {% endblock %}

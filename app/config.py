@@ -19,14 +19,20 @@ class Settings:
     secure_cookies: bool = field(default_factory=lambda: _env("SECURE_COOKIES", "0") == "1")
     timezone: str = "Europe/Moscow"
     media_dir: str = field(default_factory=lambda: _env("MEDIA_DIR", "./media"))
+    # документы проектов и вложения задач — НЕ в MEDIA_DIR (он открыт по /media); отдаются только с проверкой прав
+    files_dir: str = field(default_factory=lambda: _env("FILES_DIR", "./files"))
 
 
 # Параметры методики экспертной оценки (ЧТЗ-3, раздел 3). Меняются без правки формул.
 METHOD = {
+    "scale_max": 10,             # баллы экспертов, риски и оценки гостей — от 1 до 10
     "w_threshold": 0.5,          # порог согласованности Кендалла
     "max_rounds": 2,             # максимум туров Дельфи
     "kappa": 1.0,                # калибровка риска провала, при 1.0 совпадает с формулой ВКР
-    "risk_zones": (6, 14),       # зелёная до 6, жёлтая до 14, дальше красная
+    "risk_zones": (24, 56),      # R = P·I от 1 до 100: зелёная до 24, жёлтая до 56, дальше красная
+    "cv_zones": (20, 33),        # коэффициент вариации, %: до 20 согласованно, до 33 умеренно, выше — нет
+    "reject_below": 5.5,         # S ниже — «Отклонить или переработать концепцию»
+    "rework_below": 6.5,         # S ниже — «Доработать»
     "k_neighbors": 3,
     "feature_weights": {"format": 0.35, "price": 0.20, "capacity": 0.15, "season": 0.10, "score": 0.20},
     "eta": 0.2,                  # скорость обучения компетентности

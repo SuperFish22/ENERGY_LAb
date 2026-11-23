@@ -1,0 +1,25 @@
+{#- Карточка задачи на доске. Нужны: t, user, statuses, csrf_token, back. Работает и без JavaScript. -#}
+{%- set mine = t.assignee_id == user.id or t.author_id == user.id or user.has_role('head') -%}
+{%- set judge = t.author_id == user.id or user.has_role('head') -%}
+<article class="tcard{% if t.priority == 'high' %} tcard-high{% endif %}" data-id="{{ t.id }}" data-status="{{ t.status }}"
+         data-judge="{{ 1 if judge else 0 }}" {% if mine %}draggable="true"{% endif %} aria-labelledby="tc{{ t.id }}">
+  <h3 class="tcard-title" id="tc{{ t.id }}">{% if t.priority == 'high' %}<span class="tcard-flag">Срочно</span> {% endif %}<a href="/cabinet/tasks/{{ t.id }}" draggable="false">{{ t.title }}</a></h3>
+  {% if t.event %}<a class="tcard-project" href="/cabinet/projects/{{ t.event.id }}?tab=tasks">{{ t.event.title }}</a>{% endif %}
+  <div class="tcard-meta">
+    <span class="tcard-who" title="Исполнитель">{{ t.assignee.full_name if t.assignee else 'нет исполнителя' }}{% if t.attachments %} <span class="tcard-clip" title="Вложений: {{ t.attachments|length }}"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M20.5 11.5 12 20a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.7a1.7 1.7 0 0 1-2.4-2.4L15 7.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>{{ t.attachments|length }}<span class="sr"> вложений</span></span>{% endif %}</span>
+    {% if t.status == 'done' %}<span class="tcard-due">закрыта {{ (t.done_at or t.created_at).date()|ru_date }}</span>
+    {% elif t.days_overdue %}<span class="tcard-due is-late">просрочено на {{ t.days_overdue }} дн.</span>
+    {% elif t.due_date %}<span class="tcard-due{% if t.due_date|days_left <= 1 %} is-soon{% endif %}">до {{ t.due_date|ru_date }}</span>
+    {% else %}<span class="tcard-due is-none">без срока</span>{% endif %}
+  </div>
+  {% if mine %}
+  <form class="tcard-move" method="post" action="/cabinet/tasks/{{ t.id }}/move">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="back" value="{{ back }}">
+    <input type="hidden" name="expected" value="{{ t.status }}">
+    <label class="sr" for="mv{{ t.id }}">Колонка для «{{ t.title }}»</label>
+    <select id="mv{{ t.id }}" name="status">{% for k, v in statuses.items() %}<option value="{{ k }}" {% if t.status == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select>
+    {% if t.status == 'review' and judge %}<label class="sr" for="cm{{ t.id }}">Что исправить</label><input id="cm{{ t.id }}" name="comment" placeholder="Что исправить — если возвращаете" maxlength="500">{% endif %}
+    <button class="btn btn-small">Перенести</button>
+  </form>
+  {% endif %}
+</article>

@@ -1,10 +1,11 @@
-{% extends "cabinet/_layout.html" %}{% set nav = 'projects' %}
-{% block page_title %}{{ ev.title }}{% endblock %}
+{% extends "cabinet/_layout.html" %}{% set nav = 'evaluation' if area == 'eval' else 'projects' %}
+{% block page_title %}{% if area == 'eval' %}Оценка: {% endif %}{{ ev.title }}{% endblock %}
 {% block main %}
 <header>
-  <div><p class="muted" style="margin:0">{{ ev.code }} · {{ ev.format.name }}{% if ev.author %} · автор {{ ev.author.full_name }}{% endif %}</p>
+  <div><p class="muted" style="margin:0">{% if area == 'eval' %}<a href="/cabinet/evaluation">Оценка</a> · {% endif %}{{ ev.code }} · {{ ev.format.name }}{% if ev.author %} · автор {{ ev.author.full_name }}{% endif %}</p>
     <h1 style="font-size:2rem;margin:.2rem 0">{{ ev.title }}</h1></div>
   <div class="row-actions">
+    {% if area == 'eval' %}<a class="btn" href="/cabinet/projects/{{ ev.id }}">Карточка проекта</a>{% else %}<a class="btn" href="/cabinet/evaluation/{{ ev.id }}">Оценка проекта</a>{% endif %}
     {% if my_round_open %}<a class="btn btn-launch" href="/cabinet/projects/{{ ev.id }}/evaluate">Оценить проект</a>{% endif %}
     {% for to, who in transitions.items() if to in ('review','on_sale','held') %}
     <form method="post" action="/cabinet/projects/{{ ev.id }}/status" class="inline-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -13,8 +14,12 @@
   </div>
 </header>
 {% include "partials/tracker.html" %}
-{% set tabs = [('overview','Обзор'),('stations','Станции'),('expertise','Экспертиза'),('forecast','Прогноз и решение'),('tasks','Задачи'),('fact','Билеты и факт'),('review','Итоговая оценка'),('photos','Фотоальбом')] %}
+{% if area == 'eval' %}
+<nav class="tabs" aria-label="Этапы оценки">{% for k, t in eval_tabs.items() %}<a href="?tab={{ k }}" {% if tab == k %}aria-current="page"{% endif %}>{{ t }}</a>{% endfor %}<a class="tabs-aside" href="/cabinet/evaluation/how">Как считается оценка</a></nav>
+{% else %}
+{% set tabs = [('overview','Обзор'),('scenario','Сценарий')] + ([('docs','Документы')] if can_docs else []) + [('tasks','Задачи'),('fact','Билеты и факт'),('photos','Фотоальбом')] %}
 <nav class="tabs" aria-label="Разделы проекта">{% for k,t in tabs %}<a href="?tab={{ k }}" {% if tab == k %}aria-current="page"{% endif %}>{{ t }}</a>{% endfor %}{% if can_edit %}<a href="?tab=edit" {% if tab == 'edit' %}aria-current="page"{% endif %}>Изменить</a>{% endif %}</nav>
+{% endif %}
 
 {% if tab == 'overview' %}
 <dl class="kpi">
@@ -22,36 +27,149 @@
   <div><b>{{ ev.ticket_price|money }}</b><span>билет · {{ ev.age_rating }}</span></div>
   <div><b>{{ ev.capacity or '—' }}</b><span>мест{% if ev.venue %} · {{ ev.venue.name }}{% endif %}</span></div>
   <div><b>{{ ev.planned_budget|money }}</b><span>плановый бюджет</span></div>
-  <div><b>{{ ev.stations|sum(attribute='duration_min') }} мин</b><span>{{ ev.stations|length }} станций</span></div>
+  <div><b>{{ ev.scenario_min }} мин</b><span>сценарий · {{ ev.scenario[0]|length }} блоков{% if ev.slot_min %} из {{ ev.slot_min }} мин слота{% endif %}</span></div>
 </dl>
 <section class="panel"><h2>Концепция</h2><p>{{ ev.description or 'Описание не заполнено.' }}</p>{% if ev.target_audience %}<p class="muted">Аудитория: {{ ev.target_audience }}</p>{% endif %}</section>
 <section class="panel"><h2>Выгрузка</h2><p class="muted">Метки для шаблонов Google Диска. Гости и контакты в выгрузку не попадают.</p><p class="row-actions"><a class="btn ghost" href="/cabinet/projects/{{ ev.id }}/export.json">Скачать JSON</a> <a class="btn ghost" href="/cabinet/projects/{{ ev.id }}/export.csv">Скачать CSV</a></p></section>
 {% if decisions %}<section class="panel"><h2>Решения руководителей</h2>{% for d in decisions %}<div class="msg"><div class="who">{{ d.created_at|ru_date }} · {{ statuses[d.decision][0] }}</div>{{ d.comment or '' }}</div>{% endfor %}</section>{% endif %}
 
-{% elif tab == 'stations' %}
-<section class="panel"><h2>Маршрут: {{ ev.stations|length }} станций, {{ ev.stations|sum(attribute='duration_min') }} мин, {{ ev.stations|sum(attribute='cost')|money }}</h2>
-  {% set total = ev.stations|sum(attribute='cost') %}{% if ev.planned_budget and total > ev.planned_budget %}<p class="flash warn">Стоимость станций выше планового бюджета на {{ (total - ev.planned_budget)|money }}.</p>{% endif %}
-  <div class="table-wrap"><table><thead><tr><th>№</th><th>Станция</th><th class="num">Мин</th><th class="num">Стоимость</th><th>Ответственный</th>{% if can_edit %}<th></th>{% endif %}</tr></thead><tbody>
-  {% for st in ev.stations %}
-  <tr>{% if can_edit %}{% set f = 'stf' ~ st.id %}
-    <td>{{ st.order_no }}</td><td><input form="{{ f }}" name="title" value="{{ st.title }}" aria-label="Название"><input form="{{ f }}" name="description" value="{{ st.description or '' }}" placeholder="Описание" style="margin-top:.3rem" aria-label="Описание"></td>
-    <td><input form="{{ f }}" name="duration_min" type="number" min="1" value="{{ st.duration_min }}" style="width:5.5em" aria-label="Минуты"></td>
-    <td><input form="{{ f }}" name="cost" inputmode="decimal" value="{{ st.cost }}" style="width:7em" aria-label="Стоимость"></td>
-    <td><select form="{{ f }}" name="responsible_id" aria-label="Ответственный"><option value="">—</option>{% for u in users %}<option value="{{ u.id }}" {% if st.responsible_id == u.id %}selected{% endif %}>{{ u.full_name }}</option>{% endfor %}</select></td>
-    <td class="row-actions"><button form="{{ f }}" class="btn btn-small" name="action" value="save">Сохранить</button><button form="{{ f }}" class="btn btn-small" name="action" value="up" aria-label="Выше">↑</button><button form="{{ f }}" class="btn btn-small" name="action" value="down" aria-label="Ниже">↓</button><button form="{{ f }}" class="btn btn-small" name="action" value="delete">Удалить</button></td>
-  {% else %}<td>{{ st.order_no }}</td><td>{{ st.title }}<div class="muted small">{{ st.description or '' }}</div></td><td class="num">{{ st.duration_min }}</td><td class="num">{{ st.cost|money }}</td><td>{{ st.responsible.full_name if st.responsible else '—' }}</td>{% endif %}</tr>
-  {% else %}<tr><td colspan="6" class="empty">Станций пока нет. Добавьте первую — без станций проект не отправить на экспертизу.</td></tr>{% endfor %}
-  </tbody></table></div>
-  {% if can_edit %}{% for st in ev.stations %}<form id="stf{{ st.id }}" method="post" action="/cabinet/projects/{{ ev.id }}/stations/{{ st.id }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"></form>{% endfor %}{% endif %}
+{% elif tab == 'scenario' %}
+{% set rows, total = ev.scenario %}
+{% set cost = ev.stations|sum(attribute='cost') %}
+{% set fact_on = ev.status in ('held', 'analyzed') %}
+{% set fact_total = rows|selectattr('block.fact_min', 'ne', none)|map(attribute='block.fact_min')|sum %}
+{% macro t(min) %}{{ scenario_clock(ev.start_time, min) or ('+' ~ min ~ ' мин') }}{% endmacro %}
+{% macro hm(min) %}{% if min >= 60 %}{{ min // 60 }} ч{% if min % 60 %} {{ min % 60 }} мин{% endif %}{% else %}{{ min }} мин{% endif %}{% endmacro %}
+
+<section class="panel scn-head">
+  <div class="scn-sum">
+    <div><b>{{ hm(total) }}</b><span>сценарий{% if ev.start_time and rows %}: {{ ev.start_time }}–{{ t(total) }}{% endif %}</span></div>
+    <div><b>{{ cost|money }}</b><span>стоимость блоков</span></div>
+    <div><b>{{ ev.rated_stations|length }}</b><span>оценивают эксперты и гости</span></div>
+    {% if fact_on %}<div><b>{{ hm(fact_total) if fact_total else '—' }}</b><span>по факту{% if fact_total %}, {{ '+' if fact_total > total }}{{ fact_total - total }} мин к плану{% endif %}</span></div>{% endif %}
+  </div>
+  {% if ev.slot_min %}
+    {% if total > ev.slot_min %}<p class="flash warn">Сценарий не влезает в слот площадки на {{ total - ev.slot_min }} мин ({{ hm(total) }} при слоте {{ hm(ev.slot_min) }}).</p>
+    {% else %}<p class="flash">Влезает в слот площадки: запас {{ ev.slot_min - total }} мин из {{ hm(ev.slot_min) }}.</p>{% endif %}
+  {% endif %}
+  {% if ev.planned_budget and cost > ev.planned_budget %}<p class="flash warn">Стоимость блоков выше планового бюджета на {{ (cost - ev.planned_budget)|money }}.</p>{% endif %}
+  {% if can_edit %}
+  <form method="post" action="/cabinet/projects/{{ ev.id }}/timing" class="scn-slot"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label for="slot">Слот на площадке, мин</label><input id="slot" name="slot_min" type="number" min="0" max="1440" value="{{ ev.slot_min or '' }}" placeholder="например, 180">
+    <button class="btn btn-small">Сохранить</button>
+    {% if not ev.start_time %}<span class="small muted">Время начала мероприятия не указано — тайминг показан от нуля. Укажите его во вкладке «Изменить».</span>{% endif %}
+  </form>
+  {% endif %}
 </section>
+
+{% if fact_on and can_edit %}<form id="fact-form" method="post" action="/cabinet/projects/{{ ev.id }}/timing"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"></form>{% endif %}
+<ol class="scn">
+{% for r in rows %}{% set b = r.block %}
+  <li class="scn-row scn-{{ b.kind }}" id="b{{ b.id }}">
+    <div class="scn-time"><b>{{ t(r.start) }}</b><span>{{ t(r.end) }}</span></div>
+    <div class="scn-body">
+      <div class="scn-title"><h3>{{ b.title }}</h3>
+        <span class="scn-kind">{{ BLOCK_KINDS[b.kind] }}</span>
+        {% if b.rated %}<span class="scn-rated" title="Оценивают эксперты и гости">оценивают</span>{% endif %}</div>
+      {% if b.description %}<p class="muted">{{ b.description }}</p>{% endif %}
+      <p class="scn-meta">{{ hm(r.minutes) }}{% if b.kind == 'carousel' %} · {{ b.groups or '?' }} групп{% if b.transition_min %} · переход {{ b.transition_min }} мин{% endif %}{% endif %}{% if b.cost %} · {{ b.cost|money }}{% endif %}{% if b.responsible %} · {{ b.responsible.full_name }}{% endif %}
+        {% if fact_on %}<span class="scn-fact"><label for="fact{{ b.id }}">факт, мин</label>{% if can_edit %}<input form="fact-form" id="fact{{ b.id }}" name="fact_{{ b.id }}" type="number" min="0" value="{{ b.fact_min if b.fact_min is not none else '' }}">{% else %}<b>{{ b.fact_min if b.fact_min is not none else '—' }}</b>{% endif %}</span>{% endif %}</p>
+      {% if r.warning %}<p class="flash warn small">{{ r.warning }}</p>{% endif %}
+
+      {% if b.kind == 'carousel' %}
+      <ul class="scn-stations">
+        {% for c in r.children %}{% set sb = c.block %}
+        <li id="b{{ sb.id }}"><b>{{ sb.title }}</b><span>{{ sb.duration_min }} мин{% if sb.cost %} · {{ sb.cost|money }}{% endif %}{% if sb.responsible %} · {{ sb.responsible.full_name }}{% endif %}{% if sb.rated %} · оценивают{% endif %}</span>
+          {% if can_edit %}<details class="scn-edit"><summary>Изменить</summary>
+            <form method="post" action="/cabinet/projects/{{ ev.id }}/stations/{{ sb.id }}" class="scn-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="rated_field" value="1">
+              <div class="field"><label for="t{{ sb.id }}">Станция</label><input id="t{{ sb.id }}" name="title" value="{{ sb.title }}" required></div>
+              <div class="field"><label for="d{{ sb.id }}">Минут на круг</label><input id="d{{ sb.id }}" name="duration_min" type="number" min="1" value="{{ sb.duration_min }}"></div>
+              <div class="field"><label for="c{{ sb.id }}">Стоимость, ₽</label><input id="c{{ sb.id }}" name="cost" inputmode="decimal" value="{{ sb.cost|int }}"></div>
+              <div class="field"><label for="r{{ sb.id }}">Ответственный</label><select id="r{{ sb.id }}" name="responsible_id"><option value="">—</option>{% for u in users %}<option value="{{ u.id }}" {% if sb.responsible_id == u.id %}selected{% endif %}>{{ u.full_name }}</option>{% endfor %}</select></div>
+              <div class="field scn-wide"><label for="ds{{ sb.id }}">Описание</label><input id="ds{{ sb.id }}" name="description" value="{{ sb.description or '' }}"></div>
+              <label class="scn-check"><input type="checkbox" name="rated" value="1" {% if sb.rated %}checked{% endif %}> Оценивают эксперты и гости</label>
+              <div class="row-actions scn-wide"><button class="btn btn-small" name="action" value="save">Сохранить</button><button class="btn btn-small" name="action" value="up" aria-label="Раньше">↑</button><button class="btn btn-small" name="action" value="down" aria-label="Позже">↓</button><button class="btn btn-small" name="action" value="delete">Удалить</button></div>
+            </form></details>{% endif %}
+        </li>
+        {% endfor %}
+        {% if can_edit %}<li class="scn-add-station"><details><summary>+ Станция в карусель</summary>
+          <form method="post" action="/cabinet/projects/{{ ev.id }}/stations" class="scn-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="parent_id" value="{{ b.id }}">
+            <div class="field"><label for="ns{{ b.id }}">Станция</label><input id="ns{{ b.id }}" name="title" required></div>
+            <div class="field"><label for="nd{{ b.id }}">Минут на круг</label><input id="nd{{ b.id }}" name="duration_min" type="number" min="1" value="15"></div>
+            <div class="field"><label for="nc{{ b.id }}">Стоимость, ₽</label><input id="nc{{ b.id }}" name="cost" inputmode="decimal" value="0"></div>
+            <div class="row-actions scn-wide"><button class="btn btn-small btn-launch">Добавить станцию</button></div>
+          </form></details></li>{% endif %}
+      </ul>
+      {% endif %}
+
+      {% if can_edit %}<details class="scn-edit"><summary>Изменить блок</summary>
+        <form method="post" action="/cabinet/projects/{{ ev.id }}/stations/{{ b.id }}" class="scn-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="rated_field" value="1">
+          <div class="field"><label for="t{{ b.id }}">Название</label><input id="t{{ b.id }}" name="title" value="{{ b.title }}" required></div>
+          {% if b.kind == 'carousel' %}
+          <div class="field"><label for="g{{ b.id }}">Групп</label><input id="g{{ b.id }}" name="groups" type="number" min="1" value="{{ b.groups or 4 }}"></div>
+          <div class="field"><label for="tr{{ b.id }}">Переход, мин</label><input id="tr{{ b.id }}" name="transition_min" type="number" min="0" value="{{ b.transition_min or 0 }}"></div>
+          {% else %}
+          <div class="field"><label for="d{{ b.id }}">Длительность, мин</label><input id="d{{ b.id }}" name="duration_min" type="number" min="1" value="{{ b.duration_min }}"></div>
+          <div class="field"><label for="k{{ b.id }}">Вид</label><select id="k{{ b.id }}" name="kind"><option value="block" {% if b.kind == 'block' %}selected{% endif %}>Блок программы</option><option value="service" {% if b.kind == 'service' %}selected{% endif %}>Служебный блок</option></select></div>
+          {% endif %}
+          <div class="field"><label for="c{{ b.id }}">Стоимость, ₽</label><input id="c{{ b.id }}" name="cost" inputmode="decimal" value="{{ b.cost|int }}"></div>
+          <div class="field"><label for="r{{ b.id }}">Ответственный</label><select id="r{{ b.id }}" name="responsible_id"><option value="">—</option>{% for u in users %}<option value="{{ u.id }}" {% if b.responsible_id == u.id %}selected{% endif %}>{{ u.full_name }}</option>{% endfor %}</select></div>
+          <div class="field scn-wide"><label for="ds{{ b.id }}">Что происходит</label><input id="ds{{ b.id }}" name="description" value="{{ b.description or '' }}"></div>
+          {% if b.kind != 'carousel' %}<label class="scn-check"><input type="checkbox" name="rated" value="1" {% if b.rated %}checked{% endif %}> Оценивают эксперты и гости</label>{% endif %}
+          <div class="row-actions scn-wide"><button class="btn btn-small" name="action" value="save">Сохранить</button><button class="btn btn-small" name="action" value="up" aria-label="Раньше">↑</button><button class="btn btn-small" name="action" value="down" aria-label="Позже">↓</button><button class="btn btn-small" name="action" value="delete">Удалить{% if b.kind == 'carousel' %} со станциями{% endif %}</button></div>
+        </form></details>{% endif %}
+    </div>
+  </li>
+{% else %}
+  <li class="scn-empty">Сценарий пока пустой. Разбейте мероприятие на блоки по времени: сбор гостей, открытие, основная часть, финал. Если гости ходят по станциям группами — добавьте блок «Карусель станций».</li>
+{% endfor %}
+</ol>
+{% if fact_on and can_edit and rows %}<p class="row-actions"><button form="fact-form" class="btn">Сохранить фактическое время</button><span class="small muted">Фактическое время попадёт в «Оценка» → «Итоговая оценка»: план против факта.</span></p>{% endif %}
+
 {% if can_edit %}
-<form method="post" action="/cabinet/projects/{{ ev.id }}/stations" class="panel"><h2>Добавить станцию</h2><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-  <div class="grid-3"><div class="field"><label for="st">Название</label><input id="st" name="title" required></div>
-  <div class="field"><label for="sd">Длительность, мин</label><input id="sd" name="duration_min" type="number" min="1" value="15"></div>
-  <div class="field"><label for="sc">Стоимость, ₽</label><input id="sc" name="cost" inputmode="decimal" value="0"></div></div>
-  <div class="field"><label for="sdesc">Описание</label><input id="sdesc" name="description"></div>
-  <button class="btn btn-launch">Добавить станцию</button></form>
+<form method="post" action="/cabinet/projects/{{ ev.id }}/stations" class="panel scn-new" data-scn-new><h2>Добавить блок</h2><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="rated_field" value="1">
+  <fieldset class="scn-kinds"><legend>Вид блока</legend>
+    <label><input type="radio" name="kind" value="block" checked> <b>Блок программы</b><span>открытие, игра, концерт, финал</span></label>
+    <label><input type="radio" name="kind" value="service"> <b>Служебный</b><span>сбор гостей, перерыв, трансфер</span></label>
+    <label><input type="radio" name="kind" value="carousel"> <b>Карусель станций</b><span>группы параллельно ходят по станциям</span></label>
+  </fieldset>
+  <div class="scn-form">
+    <div class="field"><label for="nb-t">Название</label><input id="nb-t" name="title" required placeholder="Например: Открытие и легенда"></div>
+    <div class="field" data-for="block service"><label for="nb-d">Длительность, мин</label><input id="nb-d" name="duration_min" type="number" min="1" value="15"></div>
+    <div class="field" data-for="carousel" hidden><label for="nb-g">Групп</label><input id="nb-g" name="groups" type="number" min="1" value="4"></div>
+    <div class="field" data-for="carousel" hidden><label for="nb-tr">Переход между станциями, мин</label><input id="nb-tr" name="transition_min" type="number" min="0" value="2"></div>
+    <div class="field"><label for="nb-c">Стоимость, ₽</label><input id="nb-c" name="cost" inputmode="decimal" value="0"></div>
+    <div class="field"><label for="nb-r">Ответственный</label><select id="nb-r" name="responsible_id"><option value="">—</option>{% for u in users %}<option value="{{ u.id }}">{{ u.full_name }}</option>{% endfor %}</select></div>
+    <div class="field scn-wide"><label for="nb-ds">Что происходит</label><input id="nb-ds" name="description"></div>
+    <label class="scn-check" data-for="block service"><input type="checkbox" name="rated" value="1" checked> Оценивают эксперты и гости</label>
+  </div>
+  <p class="small muted" data-for="carousel" hidden>Время карусели система посчитает сама: станций × минут на круг + переходы. Станции добавляются внутри карусели после её создания.</p>
+  <button class="btn btn-launch">Добавить в сценарий</button>
+</form>
+<script>
+(() => { const f = document.querySelector('[data-scn-new]'); if (!f) return;
+  const sync = () => { const k = f.querySelector('input[name=kind]:checked').value;
+    f.querySelectorAll('[data-for]').forEach((el) => { el.hidden = !el.dataset.for.split(' ').includes(k); });
+    const r = f.querySelector('input[name=rated]'); if (r) r.checked = k === 'block'; };
+  f.addEventListener('change', (e) => { if (e.target.name === 'kind') sync(); }); sync(); })();
+</script>
 {% endif %}
+
+{% elif tab == 'docs' and can_docs %}
+{% set docs = ev.documents %}
+<section class="panel">
+  <h2>Документы проекта</h2>
+  <p class="muted">Смета, договор, райдер, сценарий — файлом или ссылкой на Яндекс Диск или Google Диск. Видят участники проекта и руководители; покупателям на сайте документы не показываются.</p>
+  {% if docs %}
+    {% for cat, label in doc_categories.items() %}{% set items = docs|selectattr('category', 'equalto', cat)|list %}
+      {% if items %}<h3 class="attach-cat">{{ label }} <span class="muted">· {{ items|length }}</span></h3>
+      {% with delete_base = '/cabinet/projects/' ~ ev.id ~ '/docs', owner_id = ev.author_id %}{% include "partials/attach_list.html" %}{% endwith %}{% endif %}
+    {% endfor %}
+  {% else %}<p class="attach-empty">Документов пока нет. Добавьте смету или ссылку на общую папку проекта на диске.</p>{% endif %}
+</section>
+<section class="panel"><h2>Добавить документ</h2>
+  {% with action = '/cabinet/projects/' ~ ev.id ~ '/docs', uid = 'doc', with_category = true %}{% include "partials/attach_form.html" %}{% endwith %}
+</section>
 
 {% elif tab == 'expertise' %}
 <div class="cols-2"><div>
@@ -67,11 +185,11 @@
     </div>{% endif %}
   </section>
   {% if can_see_results and summ.round %}
-  <section class="panel"><h2>Станции: баллы и риски</h2>
-    <div class="table-wrap"><table><thead><tr><th>Станция</th><th class="num">S</th><th class="num">P</th><th class="num">I</th><th class="num">R</th><th>Зона</th>{% if ev.status in ('held','analyzed') %}<th class="num">Гости</th>{% endif %}</tr></thead><tbody>
-    {% for s in summ.stations %}<tr><td>{{ s.station.title }}</td><td class="num">{{ s.S|num }}</td><td class="num">{{ s.P|num(1) }}</td><td class="num">{{ s.I|num(1) }}</td><td class="num">{{ s.R|num(1) }}</td><td class="zone-{{ s.zone }}">{{ s.zone_name }}</td>{% if ev.status in ('held','analyzed') %}<td class="num">{{ st_fb[s.station.id]|num(1) }}</td>{% endif %}</tr>{% endfor %}
+  <section class="panel"><h2>Блоки сценария: баллы и риски</h2>
+    <div class="table-wrap"><table><thead><tr><th>Блок</th><th class="num">S</th><th class="num">V</th><th class="num">P</th><th class="num">I</th><th class="num">R</th><th>Зона</th>{% if ev.status in ('held','analyzed') %}<th class="num">Гости</th>{% endif %}</tr></thead><tbody>
+    {% for s in summ.stations %}<tr><td>{{ s.station.title }}</td><td class="num">{{ s.S|num }}</td><td class="num agr-{{ s.agreement or 'none' }}" title="{{ s.agreement_name }}">{{ s.V|num(0) ~ ' %' if s.V is not none else '—' }}</td><td class="num">{{ s.P|num(1) }}</td><td class="num">{{ s.I|num(1) }}</td><td class="num">{{ s.R|num(1) }}</td><td class="zone-{{ s.zone }}">{{ s.zone_name }}</td>{% if ev.status in ('held','analyzed') %}<td class="num">{{ st_fb[s.station.id]|num(1) }}</td>{% endif %}</tr>{% endfor %}
     </tbody></table></div>
-    <p class="small muted">S — оценка экспертов (1–5), P и I — вероятность и последствия провала, R = P·I. Риск провала мероприятия Q = {{ summ.Q|num if summ.Q is not none else '—' }}.</p>
+    <p class="small muted">S — оценка экспертов по шкале 1–10, V — коэффициент вариации оценок экспертов: зелёный (до 20 %) — оценка блока согласованная, жёлтый (до 33 %) — умеренная, красный — несогласованная, нужен второй тур. P и I — вероятность и последствия провала (1–10), R = P·I. Риск провала мероприятия Q = {{ summ.Q|num if summ.Q is not none else '—' }}.</p>
   </section>{% endif %}
 </div><div>
   {% if user.has_role('head') %}
@@ -82,7 +200,7 @@
   {% endif %}
   {% if can_see_results and summ.S is not none %}
   <section class="panel"><h2>Итог по отделам</h2>
-    <dl class="kpi"><div><b>{{ summ.S|num }}</b><span>итоговая оценка S</span></div><div><b>{{ summ.W|num if summ.W is not none else '—' }}</b><span>согласованность W</span></div></dl>
+    <dl class="kpi"><div><b>{{ summ.S|num }}</b><span>итоговая оценка S</span></div><div><b>{{ summ.V|num(0) ~ ' %' if summ.V is not none else '—' }}</b><span>вариация V</span></div><div><b>{{ summ.W|num if summ.W is not none else '—' }}</b><span>согласованность W</span></div><div><b>{{ summ.Q|num if summ.Q is not none else '—' }}</b><span>риск провала Q</span></div></dl>
     <table><tbody>{% for name, v in summ.departments.items() %}<tr><td>{{ name }}</td><td class="num">{{ v|num }}</td></tr>{% endfor %}</tbody></table>
     {% if summ.missing_departments %}<p class="flash warn small">Нет оценок отделов: {{ summ.missing_departments|join(', ') }}. Их вес распределён между остальными.</p>{% endif %}
   </section>{% endif %}
@@ -132,7 +250,7 @@
   <section class="panel"><h2>Анкеты гостей: {{ feedbacks|length }}</h2>
     {% if feedbacks %}<p>Средняя оценка: <b>{{ (feedbacks|sum(attribute='rating') / feedbacks|length)|num }}</b></p>{% endif %}
     <p class="small">Ссылка для QR-кода на мероприятии: <code>/e/{{ ev.code }}/feedback</code></p>
-    {% for f in feedbacks[:5] if f.comment %}<div class="msg">{{ f.rating }}/5 — {{ f.comment }}</div>{% endfor %}
+    {% for f in feedbacks[:5] if f.comment %}<div class="msg">{{ f.rating }}/10 — {{ f.comment }}</div>{% endfor %}
   </section>
 </div><div>
   {% if user.has_role('head') %}{% set r = ev.result %}
@@ -158,7 +276,7 @@
 {% set r = ev.result %}
 <ol class="review-steps">
   <li class="done">Мероприятие проведено</li>
-  <li class="{{ 'done' if r else 'now' }}">{% if r %}Факт внесён{% else %}<a href="?tab=fact">Внести факт</a>{% endif %}</li>
+  <li class="{{ 'done' if r else 'now' }}">{% if r %}Факт внесён{% else %}<a href="/cabinet/projects/{{ ev.id }}?tab=fact">Внести факт</a>{% endif %}</li>
   <li class="{{ 'done' if rv.feedback.n else ('now' if r else '') }}">Анкеты гостей: {{ rv.feedback.n }}</li>
   <li class="{{ 'done' if rv.done else ('now' if r else '') }}">{{ 'Разбор полёта завершён' if rv.done else 'Оценка и выводы' }}</li>
 </ol>
@@ -171,8 +289,8 @@
     <tbody>{% for row in rv.rows %}<tr>
       <td>{{ row.metric }}</td>
       <td class="num">{% if row.plan is not none %}{{ row.plan|money if row.unit == '₽' else row.plan|num(0) }}{% else %}—{% endif %}</td>
-      <td class="num">{% if row.forecast is not none %}{{ row.forecast|money if row.unit == '₽' else row.forecast|num(1 if row.unit == 'из 5' else 0) }}{% else %}—{% endif %}</td>
-      <td class="num"><b>{% if row.fact is not none %}{{ row.fact|money if row.unit == '₽' else row.fact|num(1 if row.unit == 'из 5' else 0) }}{% else %}—{% endif %}</b></td>
+      <td class="num">{% if row.forecast is not none %}{{ row.forecast|money if row.unit == '₽' else row.forecast|num(1 if row.unit == 'из 10' else 0) }}{% else %}—{% endif %}</td>
+      <td class="num"><b>{% if row.fact is not none %}{{ row.fact|money if row.unit == '₽' else row.fact|num(1 if row.unit == 'из 10' else 0) }}{% else %}—{% endif %}</b></td>
       <td class="num">{% if row.deviation is not none %}<span class="dev dev-{{ row.tone }}">{{ '+' if row.deviation > 0 else '' }}{{ (row.deviation*100)|round|int }}%</span>{% else %}—{% endif %}</td>
     </tr>{% endfor %}</tbody>
   </table></div>
@@ -183,14 +301,26 @@
   <p class="small muted">Точность = 100 % минус средняя ошибка прогноза по гостям, билетам, выручке и затратам. Зелёным — отклонение в лучшую сторону, красным — в худшую, больше 10 %.</p>
 </section>
 
+{% if rv.timing %}
+<section class="panel"><h2>Тайминг: план и факт</h2>
+  {% set plan, fact = rv.timing_total %}
+  <p class="muted">По сценарию {{ plan }} мин{% if ev.slot_min %} при слоте площадки {{ ev.slot_min }} мин{% endif %}{% if rv.timing_filled == rv.timing|length %}, по факту {{ fact }} мин ({{ '+' if fact > plan }}{{ fact - plan }}){% elif rv.timing_filled %} · факт внесён для {{ rv.timing_filled }} из {{ rv.timing|length }} блоков{% else %} · фактическое время ещё не внесено — вкладка «Сценарий»{% endif %}.</p>
+  <div class="table-wrap"><table><thead><tr><th>Блок</th><th class="num">План, мин</th><th class="num">Факт, мин</th><th class="num">Отклонение</th></tr></thead>
+  <tbody>{% for t in rv.timing %}<tr><td>{{ t.title }}{% if t.kind == 'carousel' %} <span class="muted small">карусель</span>{% endif %}</td><td class="num">{{ t.plan }}</td><td class="num">{{ t.fact if t.fact is not none else '—' }}</td>
+    <td class="num {{ 'dev-bad' if t.delta and t.delta > 5 else ('dev-good' if t.delta is not none and t.delta < -5 else '') }}">{% if t.delta is not none %}{{ '+' if t.delta > 0 }}{{ t.delta }}{% else %}—{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+  <p class="small muted">Красным — блок затянулся больше чем на 5 минут. Это повод заложить больше времени в похожих сценариях.</p>
+</section>
+{% endif %}
 {% if rv.stations %}
-<section class="panel"><h2>Станции: эксперты и гости</h2>
-  <div class="table-wrap"><table><thead><tr><th>Станция</th><th class="num">Эксперты</th><th class="num">Риск</th><th class="num">Гости</th><th class="num">Разница</th></tr></thead>
+<section class="panel"><h2>Блоки сценария: эксперты и гости</h2>
+  <div class="table-wrap"><table><thead><tr><th>Блок</th><th class="num">Эксперты</th><th class="num">V эксп.</th><th class="num">Риск</th><th class="num">Гости</th><th class="num">V гостей</th><th class="num">Разница</th></tr></thead>
   <tbody>{% for s in rv.stations %}<tr><td>{{ s.station.title }}</td><td class="num">{{ s.S|num(2) if s.S is not none else '—' }}</td>
+    <td class="num agr-{{ s.agreement or 'none' }}" title="{{ s.agreement_name }}">{{ s.V|num(0) ~ ' %' if s.V is not none else '—' }}</td>
     <td class="num">{% if s.zone %}<span class="zone zone-{{ s.zone }}">{{ s.R|num(0) }}</span>{% else %}—{% endif %}</td>
-    <td class="num">{{ s.guests|num(2) if s.guests is not none else '—' }}{% if s.n %} <span class="muted small">({{ s.n }})</span>{% endif %}</td>
-    <td class="num">{% if s.gap is not none %}<span class="dev dev-{{ 'ok' if s.gap|abs < 0.5 else ('good' if s.gap > 0 else 'bad') }}">{{ '+' if s.gap > 0 else '' }}{{ s.gap|num(2) }}</span>{% else %}—{% endif %}</td></tr>{% endfor %}</tbody></table></div>
-  <p class="small muted">Разница больше 0,5 балла — повод обсудить станцию: эксперты переоценили (красный) или недооценили (зелёный) её для гостей.</p>
+    <td class="num">{{ s.guests|num(2) if s.guests is not none else '—' }}{% if s.n_guests %} <span class="muted small">({{ s.n_guests }})</span>{% endif %}</td>
+    <td class="num {{ {'Согласованная':'agr-high','Умеренная':'agr-medium','Несогласованная':'agr-low'}.get(s.guests_agreement, '') }}" title="{{ s.guests_agreement }}">{{ s.guests_V|num(0) ~ ' %' if s.guests_V is not none else '—' }}</td>
+    <td class="num">{% if s.gap is not none %}<span class="dev dev-{{ 'ok' if s.gap|abs < 1 else ('good' if s.gap > 0 else 'bad') }}">{{ '+' if s.gap > 0 else '' }}{{ s.gap|num(2) }}</span>{% else %}—{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+  <p class="small muted">Итог блока — средняя оценка и коэффициент вариации V = σ / x̄ · 100 %: зелёный (до 20 %) — блок оценили одинаково, жёлтый (до 33 %) — мнения умеренно расходятся, красный — разошлись, блок надо разобрать. Разница больше 1 балла — повод обсудить блок: эксперты переоценили (красный) или недооценили (зелёный) её для гостей.</p>
 </section>
 {% endif %}
 </div><div>
@@ -199,7 +329,7 @@
   {% if rv.feedback.n %}
   <dl class="kpi"><div><b>{{ rv.feedback.avg|num(2) }}</b><span>средняя оценка, анкет {{ rv.feedback.n }}</span></div><div><b>{{ rv.feedback.nps|round|int if rv.feedback.nps is not none else '—' }}</b><span>NPS (готовность рекомендовать)</span></div></dl>
   <ul class="dist">{% for k, v in rv.feedback.dist.items() %}<li><span>{{ k }}★</span><i style="width: {{ (v / rv.feedback.n * 100)|round(1) }}%"></i><b>{{ v }}</b></li>{% endfor %}</ul>
-  {% for f in rv.feedback.comments %}<div class="msg">{{ f.rating }}/5 — {{ f.comment }}</div>{% endfor %}
+  {% for f in rv.feedback.comments %}<div class="msg">{{ f.rating }}/10 — {{ f.comment }}</div>{% endfor %}
   {% else %}<p class="muted">Анкет пока нет. Ссылка для QR-кода: <code>/e/{{ ev.code }}/feedback</code> — анкета открыта 7 дней после мероприятия. Если оценку собирали иначе, впишите её ниже вручную.</p>{% endif %}
 </section>
 
@@ -208,7 +338,7 @@
   <div class="table-wrap"><table><thead><tr><th>Эксперт</th><th class="num">Оценка проекта</th><th class="num">Точность</th><th class="num">Компетентность</th></tr></thead>
   <tbody>{% for e in rv.experts %}<tr><td>{{ e.expert.user.full_name }} <span class="muted small">{{ e.expert.department.name }}</span></td><td class="num">{{ e.S_e|num(2) }}</td><td class="num">{{ (e.acc*100)|round|int }}%</td>
     <td class="num">{{ e.old|num(3) }} → <b>{{ e.new|num(3) }}</b>{% if not e.applied %} <span class="muted small">после завершения</span>{% endif %}</td></tr>{% endfor %}</tbody></table></div>
-  <p class="small muted">Точность = 1 − |оценка эксперта − оценка гостей| / 4. Компетентность обновляется по формуле c = 0,8·c + 0,2·точность и влияет на вес голоса эксперта в следующих проектах.</p>
+  <p class="small muted">Точность = 1 − |оценка эксперта − оценка гостей| / 9 (размах шкалы 1–10). Компетентность обновляется по формуле c = 0,8·c + 0,2·точность и влияет на вес голоса эксперта в следующих проектах.</p>
 </section>
 {% endif %}
 
@@ -216,7 +346,7 @@
 <form method="post" action="/cabinet/projects/{{ ev.id }}/review" class="panel">
   <h2>{{ 'Итоговая оценка' if not rv.done else 'Итоговая оценка (завершена)' }}</h2>
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-  <div class="field"><label for="rva">Оценка гостей, 1–5</label><input id="rva" name="avg_rating" inputmode="decimal" style="max-width:10rem" value="{{ (r.avg_rating if r and r.avg_rating is not none else (rv.feedback.avg|round(2) if rv.feedback.avg else ''))|string|replace('.', ',') }}">
+  <div class="field"><label for="rva">Оценка гостей, 1–10</label><input id="rva" name="avg_rating" inputmode="decimal" style="max-width:10rem" value="{{ (r.avg_rating if r and r.avg_rating is not none else (rv.feedback.avg|round(2) if rv.feedback.avg else ''))|string|replace('.', ',') }}">
     <span class="small muted">{% if rv.feedback.n %}Подставлено из {{ rv.feedback.n }} анкет — можно поправить.{% else %}Анкет нет — впишите по отзывам или опросу.{% endif %}</span></div>
   <div class="field"><label for="rvl">Выводы для следующих проектов</label><textarea id="rvl" name="lessons" rows="5" maxlength="5000" placeholder="Что сработало, что поменять, что повторить">{{ r.lessons if r and r.lessons else '' }}</textarea></div>
   <div class="row-actions">
@@ -242,6 +372,16 @@
     <button class="btn btn-launch">Загрузить</button>
   </form>
   <p class="small muted">JPG, PNG или WebP до 8 МБ. Публикуйте фото гостей только с их согласия; детей — с согласия родителей.</p>
+  <form method="post" action="/cabinet/projects/{{ ev.id }}/album" class="album-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label for="album">Полный альбом на Яндекс Диске или Google Диске</label>
+    <div class="row-actions"><input id="album" name="album_url" inputmode="url" value="{{ ev.album_url or '' }}" placeholder="https://disk.yandex.ru/d/…" style="max-width:32rem">
+      <button class="btn btn-small">Сохранить</button>
+      {% if ev.album_url %}<a href="{{ ev.album_url }}" target="_blank" rel="noopener noreferrer">Открыть</a>{% endif %}</div>
+    <p class="small muted">Сюда — все фото с мероприятия, на сайт — 10–20 лучших. На странице мероприятия появится кнопка «Все фото». Проверьте, что папка открыта по ссылке.</p>
+  </form>
+  {% elif ev.album_url %}
+  <p><a href="{{ ev.album_url }}" target="_blank" rel="noopener noreferrer">Полный альбом на диске</a></p>
   {% endif %}
   {% if ev.photos %}
   <ul class="photo-grid">

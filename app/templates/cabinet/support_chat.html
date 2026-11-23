@@ -1,0 +1,32 @@
+{% extends "cabinet/_layout.html" %}{% set nav = 'support' %}
+{% block page_title %}{{ chat.name or 'Гость' }} — поддержка{% endblock %}
+{% block main %}
+<header><div><p class="muted" style="margin:0"><a href="/cabinet/support">Поддержка</a> · #диалог{{ chat.id }} · {{ 'Telegram' if chat.channel == 'telegram' else 'ВКонтакте' }} · начат {{ chat.created_at.strftime('%d.%m.%Y %H:%M') }}</p>
+  <h1 style="font-size:1.8rem;margin:.2rem 0">{{ chat.name or 'Гость' }} <span class="status {{ 'status-rework' if chat.status == 'open' else 'status-done' if chat.status == 'answered' else '' }}" data-sup-status>{{ chat.status_name }}</span></h1></div>
+  <form method="post" action="/cabinet/support/{{ chat.id }}/status" class="row-actions"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    {% if chat.status == 'closed' %}<button class="btn" name="action" value="reopen">Открыть снова</button>{% else %}<button class="btn" name="action" value="close">Закрыть диалог</button>{% endif %}
+    {% if user.has_role('head') %}<button class="btn" name="action" value="delete">Удалить переписку</button>{% endif %}
+  </form></header>
+<div class="sup-grid">
+<section class="panel sup-chat" aria-label="Переписка">
+  <ol class="sup-thread" data-sup-thread data-feed="/cabinet/support/{{ chat.id }}/feed" data-last="{{ chat.messages[-1].id if chat.messages else 0 }}">
+  {% for x in chat.messages %}
+    <li class="bubble bubble-{{ x.direction }}" id="m{{ x.id }}"><p>{{ x.text }}</p><span class="bubble-meta">{% if x.direction == 'out' %}{{ x.author.full_name if x.author else 'Оператор' }}{% if x.source != 'web' %}, {{ 'из Telegram' if x.source == 'telegram' else 'из ВКонтакте' }}{% endif %} · {% endif %}{{ x.created_at.strftime('%d.%m %H:%M') }}</span></li>
+  {% endfor %}
+  </ol>
+  <form method="post" action="/cabinet/support/{{ chat.id }}" class="sup-reply" data-sup-form>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label for="rp" class="sr">Ответ</label>
+    <textarea id="rp" name="text" required maxlength="4000" placeholder="Ответ уйдёт человеку от имени бота Energy Lab"></textarea>
+    <div class="row-actions"><button class="btn btn-launch">Отправить</button><span class="small muted">Ctrl + Enter — отправить</span></div>
+  </form>
+</section>
+<aside class="panel">
+  <h2 style="font-size:1.1rem">Готовые ответы из FAQ</h2>
+  {% for f in hints %}<details class="sup-hint"><summary>{{ f.question }}</summary><p>{{ f.answer }}</p><button type="button" class="btn btn-small" data-insert="{{ f.answer }}">Вставить в ответ</button></details>
+  {% else %}<p class="small muted">Похожих вопросов в FAQ нет. Если вопрос частый — <a href="/cabinet/admin/faq#new">добавьте его в FAQ</a>, и бот будет подсказывать ответ сам.</p>{% endfor %}
+  <p class="small muted" style="margin-top:1rem">Переписка хранится на сервере сайта в России. Закрытые диалоги удаляются автоматически через 180 дней.</p>
+</aside>
+</div>
+<script src="/static/js/support.js?v={{ ASSET_V }}" defer></script>
+{% endblock %}

@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app import export
+from app import export, support, tasks_board
 from app import models as m
 from app.config import settings
 from app.db import get_db
@@ -66,10 +66,9 @@ class QuestionIn(Who):
     text: str = Field(min_length=3, max_length=1000)
 
 
-class SosIn(Who):
+class SupportIn(Who):
     name: str | None = Field(default=None, max_length=150)
-    text: str | None = Field(default=None, max_length=1000)
-    location: str | None = Field(default=None, max_length=200)
+    text: str = Field(min_length=1, max_length=4000)
 
 
 class DiscussionIn(Who):
@@ -83,7 +82,7 @@ class ReplyIn(Who):
 
 
 class TaskStatusIn(Who):
-    status: Literal["todo", "in_progress", "done"]
+    status: Literal["todo", "in_progress", "review", "done"]
 
 
 @router.post("/link", dependencies=[Depends(bot_auth)])
@@ -141,11 +140,17 @@ def my_tasks(channel: Channel, user_id: str, db: Session = Depends(get_db)):
 def task_status(task_id: int, data: TaskStatusIn, db: Session = Depends(get_db)):
     u = _need(db, data.channel, data.user_id)
     t = db.get(m.Task, task_id)
-    if not t or t.assignee_id != u.id:
+    # исполнитель, автор или руководитель — например, автор жмёт «Принять» под уведомлением «Проверьте задачу»
+    if not t or not any(tasks_board.roles_for(u, t)):
         raise HTTPException(404, "Задача не найдена среди ваших")
-    t.status = data.status
+    if t.status == data.status:
+        return {"ok": True, "status": t.status, "status_name": t.status_name, "note": "Статус уже такой",
+                "title": t.title}
+    res = tasks_board.move(db, u, t, data.status, source=data.channel)
+    if not res.ok:
+        raise HTTPException(409, res.error)
     db.commit()
-    return {"ok": True, "status_name": t.status_name}
+    return {"ok": True, "status": t.status, "status_name": t.status_name, "note": res.note, "title": t.title}
 
 
 @router.get("/departments", dependencies=[Depends(bot_auth)])
@@ -209,21 +214,55 @@ def question(data: QuestionIn, db: Session = Depends(get_db)):
     return {"ok": True, "id": q.id}
 
 
-@router.post("/sos", dependencies=[Depends(bot_auth)])
-def sos(data: SosIn, db: Session = Depends(get_db)):
-    """SOS не публикуется; возвращает список чатов дежурных, чтобы n8n разослал сразу в оба канала."""
-    q = m.Question(text=" | ".join(x for x in (data.text, data.location) if x) or "SOS без описания",
-                   category="SOS", status="sos", author_name=data.name, channel=data.channel,
-                   channel_user_id=data.user_id)
-    db.add(q)
-    heads = db.scalars(select(m.User).join(m.UserRole).join(m.Role).where(m.Role.code == "head",
-                                                                         m.User.is_active.is_(True))).all()
+# ------------------------------------------------------------------ вопросы и ответы, поддержка (spec 005)
+def _faq_brief(items: list[m.FaqItem]) -> list[dict]:
+    return [{"id": f.id, "question": f.question} for f in items]
+
+
+@router.get("/faq", dependencies=[Depends(bot_auth)])
+def faq(q: str = "", db: Session = Depends(get_db)):
+    """Список опубликованных вопросов; с q — только похожие (до 5)."""
+    items = support.faq_search(db, q, limit=5) if q.strip() else support.faq_items(db)[:20]
+    return {"items": _faq_brief(items), "url": f"{settings.base_url}/faq"}
+
+
+@router.get("/faq/{faq_id}", dependencies=[Depends(bot_auth)])
+def faq_item(faq_id: int, db: Session = Depends(get_db)):
+    f = db.get(m.FaqItem, faq_id)
+    if not f or not f.is_published:
+        raise HTTPException(404, "Такого вопроса больше нет. Посмотрите список: /faq")
+    return {"id": f.id, "question": f.question, "answer": f.answer}
+
+
+@router.post("/support", dependencies=[Depends(bot_auth)])
+def support_in(data: SupportIn, db: Session = Depends(get_db)):
+    """Сообщение боту, которое не команда. Участникам Lab с привязанным аккаунтом поддержка не нужна —
+    им бот покажет свои команды; внешний человек попадает в диалог с оператором."""
+    if _find(db, data.channel, data.user_id):
+        return {"linked": True}
+    if not _rate_ok(f"sup:{data.channel}:{data.user_id}", limit=20):
+        raise HTTPException(429, "Слишком много сообщений подряд. Подождите несколько минут — оператор уже видит "
+                                 "ваш вопрос")
+    chat, new = support.incoming(db, data.channel, data.user_id, data.name, data.text)
+    hints = _faq_brief(support.faq_search(db, data.text)) if new else []
     db.commit()
-    targets = [{"channel": "telegram", "chat_id": h.telegram_id} for h in heads if h.telegram_id]
-    targets += [{"channel": "vk", "chat_id": h.vk_id} for h in heads if h.vk_id]
-    phones = [h.phone for h in heads if h.phone]
-    return {"ok": True, "id": q.id, "duty": targets, "duty_phones": phones,
-            "reply": "Если есть угроза жизни или здоровью — звоните 112. Дежурные уже получили сообщение."}
+    return {"ok": True, "id": chat.id, "new": new, "faq": hints}
+
+
+@router.post("/support/{chat_id}/reply", dependencies=[Depends(bot_auth)])
+def support_reply(chat_id: int, data: ReplyIn, db: Session = Depends(get_db)):
+    """Оператор ответил в своём мессенджере (reply на сообщение с #диалогN)."""
+    u = _need(db, data.channel, data.user_id)
+    if not support.is_operator(u):
+        raise HTTPException(403, "Отвечать в диалогах поддержки могут операторы поддержки и руководители")
+    chat = db.get(m.SupportChat, chat_id)
+    if not chat:
+        raise HTTPException(404, "Диалог не найден")
+    if chat.status == "closed":
+        chat.status = "answered"                     # оператор написал в закрытый диалог — он снова открыт
+    support.reply(db, chat, u, data.text, source=data.channel)
+    db.commit()
+    return {"ok": True, "id": chat.id, "name": chat.name}
 
 
 @router.get("/events", dependencies=[Depends(bot_auth)])
@@ -239,8 +278,11 @@ def events(db: Session = Depends(get_db)):
 def pending(limit: int = 50, db: Session = Depends(get_db)):
     items = db.scalars(select(m.Notification).where(m.Notification.sent_at.is_(None))
                        .order_by(m.Notification.id).limit(min(limit, 200))).all()
+    # reply_markup — кнопки Telegram (JSON-строка); если кнопок нет — пустой объект, n8n шлёт простое сообщение.
+    # Ссылка остаётся и в тексте: кнопка-ссылка в Telegram есть только для https.
     return {"items": [{"id": n.id, "channel": n.channel, "chat_id": n.chat_id,
-                       "text": n.text + (f"\n{n.link}" if n.link else "")} for n in items]}
+                       "text": n.text + (f"\n{n.link}" if n.link else ""),
+                       "reply_markup": n.reply_markup or "{}"} for n in items]}
 
 
 @router.post("/notifications/{nid}/sent", dependencies=[Depends(bot_auth)])

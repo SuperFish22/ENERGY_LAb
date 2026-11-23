@@ -7,7 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 COPY migrations ./migrations
 COPY alembic.ini .
-RUN mkdir -p /app/media && chown lab:lab /app/media
+RUN mkdir -p /app/media /app/files && chown lab:lab /app/media /app/files
 USER lab
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s CMD python -c "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health')"

@@ -1,0 +1,81 @@
+{% extends "cabinet/_layout.html" %}
+{% block page_title %}{{ t.title }} — задача{% endblock %}
+{% block main %}
+<p class="small"><a href="/cabinet/tasks">← Все задачи</a></p>
+<header class="task-head">
+  <h1 style="font-size:1.9rem">{% if t.priority == 'high' %}<span class="tcard-flag">Срочно</span> {% endif %}{{ t.title }}</h1>
+  <span class="status status-{{ t.status }}">{{ t.status_name }}</span>
+</header>
+
+<div class="task-grid">
+  <div>
+    <section class="panel task-facts">
+      <dl>
+        <dt>Исполнитель</dt><dd>{{ t.assignee.full_name if t.assignee else 'нет исполнителя' }}</dd>
+        <dt>Поставил(а)</dt><dd>{{ t.author.full_name if t.author else '—' }}</dd>
+        <dt>Срок</dt><dd>{% if t.days_overdue %}<span class="overdue">{{ t.due_date|ru_date }}, просрочено на {{ t.days_overdue }} дн.</span>{% elif t.due_date %}{{ t.due_date|ru_date }}{% else %}<span class="muted">без срока</span>{% endif %}</dd>
+        <dt>Проект</dt><dd>{% if t.event %}<a href="/cabinet/projects/{{ t.event.id }}?tab=tasks">{{ t.event.title }}</a>{% else %}—{% endif %}</dd>
+        {% if t.done_at %}<dt>Закрыта</dt><dd>{{ t.done_at.date()|ru_date }}</dd>{% endif %}
+      </dl>
+      {% if t.description %}<p class="task-desc">{{ t.description }}</p>{% endif %}
+      {% if can_move %}
+      <form class="tcard-move task-move" method="post" action="/cabinet/tasks/{{ t.id }}/move">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="back" value="{{ back }}"><input type="hidden" name="expected" value="{{ t.status }}">
+        <label for="mv">Колонка</label>
+        <select id="mv" name="status">{% for k, v in statuses.items() %}<option value="{{ k }}" {% if t.status == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select>
+        {% if t.status == 'review' and can_edit %}<label class="sr" for="cm">Что исправить</label><input id="cm" name="comment" placeholder="Что исправить — если возвращаете" maxlength="500">{% endif %}
+        <button class="btn btn-small">Перенести</button>
+      </form>
+      {% endif %}
+    </section>
+
+    {% if can_edit %}
+    <details class="panel new-task" {% if request.query_params.get('edit') %}open{% endif %}>
+      <summary>Изменить задачу</summary>
+      <form method="post" action="/cabinet/tasks/{{ t.id }}/edit" class="new-task-form task-edit">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="field nt-title"><label for="et">Задача</label><input id="et" name="title" required maxlength="200" value="{{ t.title }}"></div>
+        <div class="field"><label for="ea">Исполнитель</label><select id="ea" name="assignee_id">{% for u in users %}<option value="{{ u.id }}" {% if u.id == t.assignee_id %}selected{% endif %}>{{ u.full_name }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="ee">Проект</label><select id="ee" name="event_id"><option value="">—</option>{% for e in events %}<option value="{{ e.id }}" {% if e.id == t.event_id %}selected{% endif %}>{{ e.title }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="ed">Срок</label><input id="ed" type="date" name="due_date" value="{{ t.due_date.isoformat() if t.due_date else '' }}"></div>
+        <div class="field"><label for="ep">Приоритет</label><select id="ep" name="priority">{% for k, v in priorities.items() %}<option value="{{ k }}" {% if t.priority == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></div>
+        <div class="field nt-title"><label for="eds">Описание</label><textarea id="eds" name="description" rows="3" maxlength="2000">{{ t.description or '' }}</textarea></div>
+        <div class="nt-submit"><button class="btn btn-launch">Сохранить</button>
+          <p class="small muted">Исполнитель и автор получат уведомление на сайте и в боте: что изменилось.</p></div>
+      </form>
+    </details>
+    {% endif %}
+  </div>
+
+  <div>
+  <section class="panel" id="files" aria-labelledby="tf">
+    <h2 id="tf">Файлы и ссылки{% if t.attachments %} <span class="muted">· {{ t.attachments|length }}</span>{% endif %}</h2>
+    {% if t.attachments %}
+      {% with items = t.attachments, delete_base = '/cabinet/tasks/' ~ t.id ~ '/files', owner_id = t.author_id %}{% include "partials/attach_list.html" %}{% endwith %}
+    {% else %}<p class="attach-empty">Пока ничего не прикреплено.</p>{% endif %}
+    {% if can_move %}
+    <details class="attach-add" {% if not t.attachments %}open{% endif %}><summary>Прикрепить файл или ссылку</summary>
+      {% with action = '/cabinet/tasks/' ~ t.id ~ '/files', uid = 'tf', with_category = false %}{% include "partials/attach_form.html" %}{% endwith %}
+      <p class="small muted">Исполнитель и автор получат уведомление на сайте и в боте.</p>
+    </details>
+    {% endif %}
+  </section>
+
+  <section class="panel task-history" aria-labelledby="th">
+    <h2 id="th">История</h2>
+    <ol>
+      {% for e in history %}
+      <li><span class="muted small">{{ e.created_at.strftime('%d.%m %H:%M') }} · {{ e.user.full_name if e.user else 'бот' }}{% if e.source != 'cabinet' %} · через {{ 'Telegram' if e.source == 'telegram' else e.source }}{% endif %}</span>
+        <p>{% if e.field == 'status' %}{{ statuses.get(e.old_value, e.old_value) }} → <b>{{ statuses.get(e.new_value, e.new_value) }}</b>
+           {% elif e.field == 'description' %}изменено описание
+           {% elif e.field == 'file' %}{% if e.new_value %}прикреплено: <b>{{ e.new_value }}</b>{% else %}удалено вложение «{{ e.old_value }}»{% endif %}
+           {% else %}{{ history_names.get(e.field, e.field)|capitalize }}: {{ e.old_value or '—' }} → <b>{{ e.new_value or '—' }}</b>{% endif %}</p>
+        {% if e.comment %}<blockquote>{{ e.comment }}</blockquote>{% endif %}</li>
+      {% else %}
+      <li class="muted">Изменений пока не было. Задачу поставили {{ t.created_at.strftime('%d.%m.%Y') }}.</li>
+      {% endfor %}
+    </ol>
+  </section>
+  </div>
+</div>
+{% endblock %}

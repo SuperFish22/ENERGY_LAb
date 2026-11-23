@@ -12,11 +12,11 @@
   <form method="post">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <fieldset class="field" style="border:0;padding:0"><legend>Мероприятие в целом</legend>
-      <div class="scale">{% for i in range(1,6) %}<label><input type="radio" name="rating" value="{{ i }}" required><span>{{ i }}</span></label>{% endfor %}</div>
+      <div class="scale">{% for i in range(1,11) %}<label><input type="radio" name="rating" value="{{ i }}" required><span>{{ i }}</span></label>{% endfor %}</div>
     </fieldset>
-    {% for st in ev.stations %}
+    {% for st in ev.rated_stations %}
     <fieldset class="field" style="border:0;padding:0"><legend>{{ st.title }} <span class="muted small">(можно пропустить)</span></legend>
-      <div class="scale">{% for i in range(1,6) %}<label><input type="radio" name="st_{{ st.id }}" value="{{ i }}"><span>{{ i }}</span></label>{% endfor %}</div>
+      <div class="scale">{% for i in range(1,11) %}<label><input type="radio" name="st_{{ st.id }}" value="{{ i }}"><span>{{ i }}</span></label>{% endfor %}</div>
     </fieldset>
     {% endfor %}
     <div class="field"><label for="nps">Насколько вероятно, что вы порекомендуете нас другу? (0–10)</label>

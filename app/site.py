@@ -1,5 +1,8 @@
 """Настройки главной страницы: значения по умолчанию из config.py + то, что руководитель сохранил в кабинете."""
 import copy
+import re
+import time
+from urllib.parse import urlsplit
 
 from sqlalchemy.orm import Session
 
@@ -15,14 +18,12 @@ TEXTS_DEFAULT = {
     "crew_intro": "Energy Lab — творческая лаборатория педагогического отряда ENERGY. Вожатые и организаторы "
                   "с опытом лагерных смен работают пятью отделами, и каждый проект проходит проверку всех пяти, "
                   "прежде чем вы на него придёте.",
-    "vk_url": "https://vk.ru/planeta.energy",
 }
 TEXT_LABELS = {
     "eyebrow": "Подпись над заголовком",
     "lead": "Текст под заголовком",
-    "request_intro": "Текст у формы заявки",
+    "request_intro": "Текст вверху страницы «Заказать мероприятие»",
     "crew_intro": "Текст блока «Кто создаёт тусовки»",
-    "vk_url": "Ссылка на сообщество ВКонтакте",
 }
 
 
@@ -65,3 +66,86 @@ def pricing(db: Session) -> dict:
 
 def save_pricing(db: Session, data: dict) -> None:
     _set(db, "pricing", data)
+
+
+# ------------------------------------------------------------------ соцсети (spec 005)
+# Ключ → (название, допустимые домены). Ссылка принимается только на домен своей сети и только https.
+NETWORKS = {
+    "vk": ("ВКонтакте", {"vk.com", "vk.ru", "m.vk.com", "m.vk.ru"}),
+    "telegram": ("Telegram", {"t.me", "telegram.me"}),
+    "instagram": ("Instagram", {"instagram.com", "www.instagram.com"}),
+    "youtube": ("YouTube", {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"}),
+    "bot": ("Бот для вопросов (Telegram)", {"t.me", "telegram.me"}),   # не иконка: кнопка «Написать оператору»
+}
+ICONS = ("vk", "telegram", "instagram", "youtube")
+SOCIALS_DEFAULT = {"vk": "https://vk.ru/planeta.energy", "telegram": "", "instagram": "", "youtube": "", "bot": ""}
+META_NOTE = "Instagram принадлежит компании Meta, деятельность которой признана экстремистской и запрещена в России."
+
+
+def social_url(key: str, raw: str) -> str | None:
+    """Нормализованная ссылка или None, если она не ведёт в эту соцсеть. Для Telegram можно написать @ник."""
+    raw = (raw or "").strip()
+    if key in ("telegram", "bot") and re.fullmatch(r"@?[A-Za-z][A-Za-z0-9_]{3,31}", raw):
+        return "https://t.me/" + raw.lstrip("@")
+    if not re.match(r"^https?://", raw, re.I):
+        raw = "https://" + raw
+    try:
+        parts = urlsplit(raw)
+        port = parts.port
+    except ValueError:
+        return None
+    host = (parts.hostname or "").lower()
+    if host not in NETWORKS[key][1] or parts.username or port not in (None, 443) or len(raw) > 300:
+        return None
+    return "https://" + raw.split("://", 1)[1]
+
+
+def socials(db: Session) -> dict:
+    saved = _get(db, "socials")
+    if saved is None:                                     # раньше ссылка на VK хранилась среди текстов
+        old = (_get(db, "texts") or {}).get("vk_url")
+        saved = {**SOCIALS_DEFAULT, **({"vk": old} if old else {})}
+    return {k: saved.get(k, "") or "" for k in NETWORKS}
+
+
+def save_socials(db: Session, data: dict) -> list[str]:
+    """Сохраняет правильные ссылки; неправильные оставляет прежними и возвращает список ошибок."""
+    cur, errors = socials(db), []
+    for k, (name, _) in NETWORKS.items():
+        raw = (data.get(k) or "").strip()
+        if not raw:
+            cur[k] = ""
+            continue
+        url = social_url(k, raw)
+        if url:
+            cur[k] = url
+        else:
+            errors.append(f"{name} — нужна ссылка на {', '.join(sorted(NETWORKS[k][1])[:2])}")
+    _set(db, "socials", cur)
+    _cache["at"] = 0
+    return errors
+
+
+_cache: dict = {"at": 0.0, "value": {}}
+
+
+def _cached() -> dict:
+    if time.time() - _cache["at"] > 60:
+        from app.db import SessionLocal
+        try:
+            with SessionLocal() as db:
+                _cache["value"] = socials(db)
+        except Exception:                                  # нет таблицы (миграции не применены) — без ссылок
+            _cache["value"] = {}
+        _cache["at"] = time.time()
+    return _cache["value"]
+
+
+def social_links() -> list[dict]:
+    """Иконки соцсетей для шапки и подвала любых страниц (глобальная функция шаблонов). Кэш 60 с."""
+    cur = _cached()
+    return [{"key": k, "name": NETWORKS[k][0], "url": cur[k]} for k in ICONS if cur.get(k)]
+
+
+def bot_url() -> str:
+    return _cached().get("bot", "")

@@ -39,7 +39,7 @@ async def assign_experts(event_id: int, request: Request, db: Session = Depends(
             db.add(m.EventExpert(event_id=ev.id, expert_id=eid))
     db.commit()
     flash(request, "Состав экспертов сохранён")
-    return RedirectResponse(f"/cabinet/projects/{ev.id}?tab=expertise", 303)
+    return RedirectResponse(f"/cabinet/evaluation/{ev.id}?tab=expertise", 303)
 
 
 @router.post("/rounds", dependencies=[Depends(csrf)])
@@ -51,11 +51,11 @@ def open_round(event_id: int, request: Request, deadline: str = Form(""), db: Se
     last = service.latest_round(db, ev.id)
     if last and last.is_open:
         flash(request, "Предыдущий тур ещё открыт", "error")
-        return RedirectResponse(f"/cabinet/projects/{ev.id}?tab=expertise", 303)
+        return RedirectResponse(f"/cabinet/evaluation/{ev.id}?tab=expertise", 303)
     no = (last.round_no + 1) if last else 1
     if no > METHOD["max_rounds"]:
         flash(request, f"Не более {METHOD['max_rounds']} туров на проект", "error")
-        return RedirectResponse(f"/cabinet/projects/{ev.id}?tab=expertise", 303)
+        return RedirectResponse(f"/cabinet/evaluation/{ev.id}?tab=expertise", 303)
     rnd = m.ExpertiseRound(event_id=ev.id, round_no=no, deadline=date.fromisoformat(deadline) if deadline else None)
     db.add(rnd)
     db.flush()
@@ -73,7 +73,7 @@ def open_round(event_id: int, request: Request, deadline: str = Form(""), db: Se
     audit(db, user.id, "round_open", ev.code, str(no))
     db.commit()
     flash(request, f"Тур {no} открыт, эксперты получили уведомления")
-    return RedirectResponse(f"/cabinet/projects/{ev.id}?tab=expertise", 303)
+    return RedirectResponse(f"/cabinet/evaluation/{ev.id}?tab=expertise", 303)
 
 
 @router.post("/rounds/close", dependencies=[Depends(csrf)])
@@ -84,12 +84,18 @@ def close_round(event_id: int, request: Request, db: Session = Depends(get_db),
     if not rnd or not rnd.is_open:
         raise HTTPException(400, "Нет открытого тура")
     w = service.close_round(db, rnd, ev)
-    if delphi.needs_second_round(w, rnd.round_no, METHOD["w_threshold"], METHOD["max_rounds"]):
-        flash(request, f"Тур закрыт. Согласованность W = {w:.2f} ниже порога {METHOD['w_threshold']}: "
-                       f"рекомендуем открыть второй тур Дельфи", "warn")
+    max_v = service.summary(db, ev, rnd)["max_V"]
+    if delphi.needs_second_round(w, rnd.round_no, METHOD["w_threshold"], METHOD["max_rounds"], max_v,
+                                 METHOD["cv_zones"][1]):
+        why = []
+        if w is not None and w < METHOD["w_threshold"]:
+            why.append(f"W = {w:.2f} ниже порога {METHOD['w_threshold']}")
+        if max_v is not None and max_v > METHOD["cv_zones"][1]:
+            why.append(f"коэффициент вариации блока {max_v:.0f} % выше {METHOD['cv_zones'][1]} %")
+        flash(request, "Тур закрыт: " + "; ".join(why) + ". Рекомендуем открыть второй тур Дельфи", "warn")
     else:
         flash(request, "Тур закрыт" + (f", W = {w:.2f}" if w is not None else ""))
-    return RedirectResponse(f"/cabinet/projects/{ev.id}?tab=expertise", 303)
+    return RedirectResponse(f"/cabinet/evaluation/{ev.id}?tab=expertise", 303)
 
 
 @router.get("/evaluate")
@@ -104,7 +110,7 @@ def evaluate_form(event_id: int, request: Request, station: int | None = None, d
         return render(request, "public/message.html", {"user": user, "title": "Тур закрыт",
                                                        "text": "Сейчас по проекту нет открытого тура экспертизы."})
     crits = ex.department.criteria
-    targets = [None] + [s.id for s in ev.stations]
+    targets = [None] + [s.id for s in ev.rated_stations]
     cur = station if station in targets else None
     mine = {(e.criterion_id, e.station_id): e for e in db.scalars(select(m.Evaluation).where(
         m.Evaluation.round_id == rnd.id, m.Evaluation.expert_id == ex.id))}
@@ -116,7 +122,7 @@ def evaluate_form(event_id: int, request: Request, station: int | None = None, d
                                                         m.ExpertiseRound.round_no == rnd.round_no - 1))
         medians = service.round_medians(db, prev)
     done = {t: all((c.id, t) in mine and mine[(c.id, t)].submitted for c in crits) for t in targets}
-    st_obj = next((s for s in ev.stations if s.id == cur), None)
+    st_obj = next((s for s in ev.rated_stations if s.id == cur), None)
     return render(request, "cabinet/evaluate.html", {
         "user": user, "ev": ev, "rnd": rnd, "crits": crits, "cur": cur, "station": st_obj, "mine": mine,
         "risk": risks.get(cur), "medians": medians, "done": done, "zones": METHOD["risk_zones"]})
@@ -134,7 +140,7 @@ async def evaluate_save(event_id: int, request: Request, db: Session = Depends(g
         raise HTTPException(400, "Тур закрыт")
     form = await request.form()
     station_id = int(form["station_id"]) if form.get("station_id") else None
-    if station_id and station_id not in {s.id for s in ev.stations}:
+    if station_id and station_id not in {s.id for s in ev.rated_stations}:
         raise HTTPException(400, "Станция не относится к проекту")
     submit = form.get("action") == "submit"
     own = {c.id for c in ex.department.criteria}
@@ -152,15 +158,15 @@ async def evaluate_save(event_id: int, request: Request, db: Session = Depends(g
         if cid not in own:
             raise HTTPException(403, "Можно оценивать только критерии своего отдела")
         score = int(val)
-        if not 1 <= score <= 5:
-            errors.append("Балл от 1 до 5")
+        if not 1 <= score <= METHOD["scale_max"]:
+            errors.append(f"Балл от 1 до {METHOD['scale_max']}")
             continue
         comment = (form.get(f"comment_{cid}") or "").strip()
-        if score <= 2 and not comment:
-            errors.append("При балле 1 или 2 напишите комментарий")
+        if score <= 3 and not comment:
+            errors.append("При балле от 1 до 3 напишите комментарий")
         p = prev_scores.get((cid, station_id))
-        if p is not None and abs(p - score) > 1 and not comment:
-            errors.append("Балл изменён больше чем на 1 — укажите причину в комментарии")
+        if p is not None and abs(p - score) > 2 and not comment:
+            errors.append("Балл изменён больше чем на 2 — укажите причину в комментарии")
         e = db.scalar(select(m.Evaluation).where(m.Evaluation.round_id == rnd.id, m.Evaluation.expert_id == ex.id,
                                                  m.Evaluation.criterion_id == cid,
                                                  m.Evaluation.station_id.is_(None) if station_id is None
@@ -171,7 +177,7 @@ async def evaluate_save(event_id: int, request: Request, db: Session = Depends(g
         e.score, e.comment, e.submitted = score, comment or None, submit or e.submitted
     if station_id and form.get("probability") and form.get("impact"):
         p, i = int(form["probability"]), int(form["impact"])
-        if 1 <= p <= 5 and 1 <= i <= 5:
+        if 1 <= p <= METHOD["scale_max"] and 1 <= i <= METHOD["scale_max"]:
             r = db.scalar(select(m.RiskAssessment).where(m.RiskAssessment.round_id == rnd.id,
                                                          m.RiskAssessment.expert_id == ex.id,
                                                          m.RiskAssessment.station_id == station_id))
@@ -201,7 +207,7 @@ def make_forecast(event_id: int, request: Request, db: Session = Depends(get_db)
             ev.status = "evaluated"
             db.commit()
     flash(request, f"Прогноз рассчитан: {fc.recommendation}")
-    return RedirectResponse(f"/cabinet/projects/{ev.id}?tab=forecast", 303)
+    return RedirectResponse(f"/cabinet/evaluation/{ev.id}?tab=forecast", 303)
 
 
 @router.get("/conclusion")

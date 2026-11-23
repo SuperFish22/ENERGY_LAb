@@ -11,7 +11,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.config import settings
 from app.db import Base, SessionLocal, engine
 from app.deps import LoginRequired, render
-from app.routers import admin, api_bot, auth, cabinet, expertise, public
+from app.routers import admin, api_bot, auth, cabinet, evaluation, expertise, public, support
 
 
 @asynccontextmanager
@@ -32,7 +32,8 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 os.makedirs(settings.media_dir, exist_ok=True)
 app.mount("/media", StaticFiles(directory=settings.media_dir), name="media")
 
-for r in (public.router, auth.router, cabinet.router, expertise.router, admin.router, api_bot.router):
+for r in (public.router, auth.router, cabinet.router, evaluation.router, expertise.router, admin.router,
+          support.router, api_bot.router):
     app.include_router(r)
 
 

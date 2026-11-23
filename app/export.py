@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import models as m
+from app import scenario
 from app.config import settings
 
 
@@ -37,6 +38,7 @@ def event_placeholders(db: Session, ev: m.Event) -> dict:
         "CAPACITY": ev.capacity, "AUDIENCE": ev.target_audience or "", "DESCRIPTION": ev.description or "",
         "AUTHOR": ev.author.full_name if ev.author else "",
         "STATIONS_COUNT": len(ev.stations),
+        "SCENARIO_MINUTES": ev.scenario_min,
         "STATIONS_COST": _f(sum(float(s.cost or 0) for s in ev.stations)),
         "SCORE": _f(fc.expert_score) if fc else None, "KENDALL_W": _f(fc.kendall_w) if fc else None,
         "ATTENDANCE": fc.attendance if fc else None,
@@ -54,9 +56,21 @@ def event_placeholders(db: Session, ev: m.Event) -> dict:
 
 
 def event_tables(ev: m.Event) -> dict:
-    return {"stations": [{"no": s.order_no, "title": s.title, "duration_min": s.duration_min,
-                          "cost": _f(s.cost), "responsible": s.responsible.full_name if s.responsible else ""}
-                         for s in ev.stations]}
+    """Таблица сценария для шаблона: блоки по времени, станции каруселей — строками с пометкой «станция»."""
+    rows, _ = ev.scenario
+
+    def line(no, r, parent=""):
+        b = r.block
+        return {"no": no, "start": scenario.clock(ev.start_time, r.start) or f"+{r.start}",
+                "end": scenario.clock(ev.start_time, r.end) or f"+{r.end}", "kind": scenario.KINDS[b.kind],
+                "title": f"{parent} → {b.title}" if parent else b.title, "duration_min": r.minutes,
+                "cost": _f(b.cost), "responsible": b.responsible.full_name if b.responsible else ""}
+
+    out = []
+    for i, r in enumerate(rows, 1):
+        out.append(line(str(i), r))
+        out += [line(f"{i}.{j}", c, r.block.title) for j, c in enumerate(r.children, 1)]
+    return {"scenario": out}
 
 
 REGISTRY_COLUMNS = ["CODE", "TITLE", "FORMAT", "STATUS", "DATE", "VENUE", "PRICE", "BUDGET_PLAN", "CAPACITY",

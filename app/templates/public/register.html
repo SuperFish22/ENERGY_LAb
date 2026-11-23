@@ -3,7 +3,7 @@
 {% block body %}
 {% include "partials/public_top.html" %}
 <main class="wrap" style="max-width:480px;padding:40px 24px 80px">
-  <h1>Добро пожаловать в экипаж</h1>
+  <h1>Добро пожаловать в состав Energy Lab</h1>
   {% if error %}<div class="flash error" role="alert">{{ error }}</div>{% endif %}
   <form method="post">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

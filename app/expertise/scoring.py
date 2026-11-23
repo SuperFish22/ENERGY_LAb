@@ -1,4 +1,4 @@
-"""Метод А — взвешенная оценка по критериям (формулы 1–3 ВКР)."""
+"""Метод А — взвешенная оценка по критериям и коэффициент вариации оценок (шкала 1–10)."""
 from collections import defaultdict
 from dataclasses import dataclass
 
@@ -27,6 +27,34 @@ def weighted_mean(values: list[float], competences: list[float]) -> float:
         raise ValueError("нет оценок")
     den = sum(competences)
     return sum(c * x for c, x in zip(competences, values, strict=True)) / den
+
+
+def variation(values: list[float], competences: list[float] | None = None) -> dict | None:
+    """Коэффициент вариации V = σ / x̄ · 100 %, σ — взвешенное по компетентности стандартное отклонение.
+
+    Возвращает среднее, σ и V; для одного значения V = 0. Пусто — None.
+    """
+    if not values:
+        return None
+    c = competences or [1.0] * len(values)
+    den = sum(c)
+    mean = sum(ci * x for ci, x in zip(c, values, strict=True)) / den
+    sigma = (sum(ci * (x - mean) ** 2 for ci, x in zip(c, values, strict=True)) / den) ** 0.5
+    return {"mean": mean, "sigma": sigma, "V": sigma / mean * 100 if mean else 0.0, "n": len(values)}
+
+
+def agreement(v: float | None, zones=(20, 33)) -> str | None:
+    """Шкала согласованности по коэффициенту вариации."""
+    if v is None:
+        return None
+    if v <= zones[0]:
+        return "high"
+    if v <= zones[1]:
+        return "medium"
+    return "low"
+
+
+AGREEMENT_NAMES = {"high": "Согласованная", "medium": "Умеренная", "low": "Несогласованная"}
 
 
 def object_score(scores: list[Score], criteria: dict[int, tuple[int, float]], dept_weights: dict[int, float],

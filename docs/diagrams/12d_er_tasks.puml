@@ -1,0 +1,184 @@
+@startuml
+!include _style.iuml
+skinparam defaultFontSize 13
+skinparam monochrome false
+skinparam ClassBackgroundColor white
+skinparam ClassBorderColor black
+hide circle
+hide methods
+skinparam linetype ortho
+entity tasks {
+  *id : INT <<PK>>
+  --
+  event_id : INT <<FK>>
+  department_id : INT <<FK>>
+  title : VARCHAR(200)
+  description : TEXT
+  assignee_id : INT <<FK>>
+  author_id : INT <<FK>>
+  status : VARCHAR(20)
+  due_date : DATE
+  created_at : TIMESTAMP
+  position : INT
+  priority : VARCHAR(10)
+  done_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+entity task_events {
+  *id : INT <<PK>>
+  --
+  task_id : INT <<FK>>
+  user_id : INT <<FK>>
+  field : VARCHAR(20)
+  old_value : VARCHAR(50)
+  new_value : VARCHAR(50)
+  comment : TEXT
+  source : VARCHAR(10)
+  created_at : TIMESTAMP
+}
+entity notifications {
+  *id : INT <<PK>>
+  --
+  user_id : INT <<FK>>
+  channel : VARCHAR(10)
+  chat_id : VARCHAR(40)
+  text : TEXT
+  link : VARCHAR(255)
+  reply_markup : TEXT
+  created_at : TIMESTAMP
+  sent_at : TIMESTAMP
+}
+entity inbox {
+  *id : INT <<PK>>
+  --
+  user_id : INT <<FK>>
+  kind : VARCHAR(12)
+  text : TEXT
+  link : VARCHAR(255)
+  task_id : INT <<FK>>
+  actor_id : INT <<FK>>
+  created_at : TIMESTAMP
+  read_at : TIMESTAMP
+}
+entity discussions {
+  *id : INT <<PK>>
+  --
+  department_id : INT <<FK>>
+  event_id : INT <<FK>>
+  title : VARCHAR(200)
+  author_id : INT <<FK>>
+  status : VARCHAR(10)
+  source : VARCHAR(10)
+  created_at : TIMESTAMP
+}
+entity messages {
+  *id : INT <<PK>>
+  --
+  discussion_id : INT <<FK>>
+  author_id : INT <<FK>>
+  text : TEXT
+  source : VARCHAR(10)
+  created_at : TIMESTAMP
+}
+entity questions {
+  *id : INT <<PK>>
+  --
+  text : TEXT
+  category : VARCHAR(30)
+  status : VARCHAR(20)
+  author_name : VARCHAR(150)
+  channel : VARCHAR(10)
+  channel_user_id : VARCHAR(40)
+  answer : TEXT
+  moderated_by : INT <<FK>>
+  created_at : TIMESTAMP
+}
+entity faq {
+  *id : INT <<PK>>
+  --
+  question : VARCHAR(300)
+  answer : TEXT
+  topic : VARCHAR(40)
+  order_no : INT
+  is_published : BOOLEAN
+  question_id : INT <<FK>>
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+entity support_chats {
+  *id : INT <<PK>>
+  --
+  channel : VARCHAR(10)
+  chat_id : VARCHAR(40)
+  name : VARCHAR(150)
+  status : VARCHAR(10)
+  operator_id : INT <<FK>>
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+entity support_messages {
+  *id : INT <<PK>>
+  --
+  chat_id : INT <<FK>>
+  direction : VARCHAR(3)
+  text : TEXT
+  author_id : INT <<FK>>
+  source : VARCHAR(10)
+  created_at : TIMESTAMP
+}
+entity audit_log {
+  *id : INT <<PK>>
+  --
+  user_id : INT <<FK>>
+  action : VARCHAR(60)
+  object : VARCHAR(60)
+  details : TEXT
+  created_at : TIMESTAMP
+}
+entity site_settings {
+  *key : VARCHAR(60) <<PK>>
+  --
+  value : JSON
+  updated_at : TIMESTAMP
+}
+entity departments #DDDDDD {
+  *id : INT <<PK>>
+}
+entity events #DDDDDD {
+  *id : INT <<PK>>
+}
+entity users #DDDDDD {
+  *id : INT <<PK>>
+}
+departments ||--o{ discussions
+departments ||--o{ tasks
+discussions ||--o{ messages
+events ||--o{ discussions
+events ||--o{ tasks
+questions ||--o{ faq
+support_chats ||--o{ support_messages
+tasks ||--o{ inbox
+tasks ||--o{ task_events
+users ||--o{ audit_log
+users ||--o{ discussions
+users ||--o{ inbox
+users ||--o{ messages
+users ||--o{ notifications
+users ||--o{ questions
+users ||--o{ support_chats
+users ||--o{ support_messages
+users ||--o{ task_events
+users ||--o{ tasks
+support_messages -[hidden]down-> notifications
+faq -[hidden]down-> site_settings
+messages -[hidden]down-> audit_log
+legend bottom left
+  <b>Обозначения</b>
+  | прямоугольник | таблица: над чертой первичный ключ, под чертой остальные столбцы |
+  | серый прямоугольник только с ключом | таблица из другого рисунка физической модели |
+  | <<PK>> | первичный ключ |
+  | <<FK>> | внешний ключ |
+  | <<UK>> | уникальное значение |
+  | две черты — вилка с кружком | связь «один ко многим» (ноль или много записей) |
+endlegend
+@enduml

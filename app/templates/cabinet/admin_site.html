@@ -4,7 +4,7 @@
 <h1 style="font-size:2rem">Главная страница</h1>
 <p class="muted">Всё, что здесь меняется, сразу видно покупателям на <a href="/" target="_blank" rel="noopener">главной</a>.</p>
 <p><a class="btn" href="/cabinet/archive/new">Внести прошедшую тусовку в фотоальбом</a></p>
-<nav class="tabs" aria-label="Разделы настроек"><a href="#team">Команда в слайдере</a><a href="#texts">Тексты</a><a href="#pricing">Калькулятор стоимости</a></nav>
+<nav class="tabs" aria-label="Разделы настроек"><a href="#team">Команда в слайдере</a><a href="#texts">Тексты</a><a href="#socials">Соцсети</a><a href="#pricing">Калькулятор стоимости</a></nav>
 
 <!-- ============ Команда ============ -->
 <section class="panel" id="team">
@@ -68,6 +68,23 @@
   {% endfor %}
   <p class="small muted">Пустое поле — вернётся текст по умолчанию.</p>
   <button class="btn btn-launch">Сохранить тексты</button>
+</form>
+
+<!-- ============ Соцсети ============ -->
+<form method="post" action="/cabinet/admin/site/socials" class="panel" id="socials">
+  <h2>Соцсети</h2>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <p class="small muted">Ссылки появляются в шапке и подвале всех страниц сайта. Пустое поле — соцсеть не показывается. Принимаются только ссылки на домен самой соцсети.</p>
+  <div class="grid-2">
+  {% for key, (name, hosts) in networks.items() %}
+  <div class="field"><label for="so-{{ key }}">{{ name }}</label>
+    <input id="so-{{ key }}" name="{{ key }}" value="{{ socials[key] }}" maxlength="300" inputmode="url" placeholder="{{ {'vk':'https://vk.ru/…','telegram':'https://t.me/канал или @канал','instagram':'https://instagram.com/…','youtube':'https://youtube.com/@…','bot':'https://t.me/имя_бота или @имя_бота'}[key] }}">
+    {% if key == 'instagram' %}<p class="small muted">Рядом со ссылкой на сайте автоматически появится пометка: «{{ META_NOTE }}» Без неё размещать ссылку нельзя.</p>{% endif %}
+    {% if key == 'bot' %}<p class="small muted">Не показывается иконкой: это кнопка «Написать в Telegram» на странице «Вопросы и ответы». Сообщения из бота попадают в «Поддержку».</p>{% endif %}
+  </div>
+  {% endfor %}
+  </div>
+  <button class="btn btn-launch">Сохранить ссылки</button>
 </form>
 
 <!-- ============ Калькулятор ============ -->

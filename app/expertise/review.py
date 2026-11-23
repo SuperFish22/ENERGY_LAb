@@ -1,7 +1,7 @@
 """Итоговая оценка (разбор полёта): план → прогноз → факт, голос гостей и точность экспертов.
 
-Замыкает цикл планирования: насколько прогноз попал в факт, какие станции гости оценили иначе,
-чем эксперты, и как изменится компетентность каждого эксперта (формула 10 ВКР).
+Замыкает цикл планирования: насколько прогноз попал в факт, уложились ли в тайминг, какие блоки сценария
+гости оценили иначе, чем эксперты, и как изменится компетентность каждого эксперта (формула 10 ВКР).
 """
 from dataclasses import dataclass
 
@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import models as m
+from app import scenario
 from app.config import METHOD
 from app.expertise import competence, scoring, service
 
@@ -60,6 +61,7 @@ def build(db: Session, ev: m.Event) -> dict:
     price = float(ev.ticket_price or 0)
     cap = ev.capacity or (ev.venue.capacity if ev.venue else None)
     guest_avg = sum(f.rating for f in fbs) / len(fbs) if fbs else None
+    guest_var = scoring.variation([f.rating for f in fbs])
     rating_fact = res.avg_rating if res and res.avg_rating is not None else guest_avg
 
     rows = [
@@ -69,8 +71,16 @@ def build(db: Session, ev: m.Event) -> dict:
             float(res.revenue) if res else None),
         Row("Затраты", "₽", float(ev.planned_budget or 0) or None, fc.budget if fc else None,
             float(res.actual_cost) if res else None, better="less"),
-        Row("Оценка гостей", "из 5", None, fc.avg_rating if fc else None, rating_fact),
+        Row("Оценка гостей", "из 10", None, fc.avg_rating if fc else None, rating_fact),
     ]
+    # тайминг (spec 002): план — слот площадки, «прогноз» — длительность по сценарию, факт — сумма фактического времени
+    scn_rows, scn_total = ev.scenario
+    fact_total, filled = scenario.fact_minutes(list(ev.stations))
+    if scn_total:
+        rows.append(Row("Длительность", "мин", ev.slot_min, scn_total,
+                        fact_total if filled == len(scn_rows) else None, better="less"))
+    timing = [{"title": r.block.title, "kind": r.block.kind, "plan": r.minutes, "fact": r.block.fact_min,
+               "delta": None if r.block.fact_min is None else r.block.fact_min - r.minutes} for r in scn_rows]
     in_range = None
     if fc and fc.attendance_low is not None and res:
         in_range = fc.attendance_low <= res.guests_count <= fc.attendance_high
@@ -81,7 +91,10 @@ def build(db: Session, ev: m.Event) -> dict:
     for s in summ["stations"]:
         vals = db.scalars(select(m.FeedbackStation.rating).where(m.FeedbackStation.station_id == s["station"].id)).all()
         g = sum(vals) / len(vals) if vals else None
-        stations.append({**s, "guests": g, "n": len(vals),
+        gv = scoring.variation(list(vals))
+        g_agr = scoring.agreement(gv["V"], METHOD["cv_zones"]) if gv else None
+        stations.append({**s, "guests": g, "n_guests": len(vals), "guests_V": gv["V"] if gv else None,
+                         "guests_agreement": scoring.AGREEMENT_NAMES.get(g_agr, "—"),
                          "gap": (g - s["S"]) if g is not None and s["S"] is not None else None})
 
     # точность экспертов
@@ -102,13 +115,17 @@ def build(db: Session, ev: m.Event) -> dict:
             h = hist.get(eid)
             old = h.old_value if h else ex.competence
             new = h.new_value if h else competence.update(ex.competence, s_e, rating_fact, METHOD["eta"],
-                                                          METHOD["competence_bounds"])
-            experts.append({"expert": ex, "S_e": s_e, "acc": 1 - abs(s_e - rating_fact) / 4, "old": old, "new": new,
+                                                          METHOD["competence_bounds"], METHOD["scale_max"])
+            acc = 1 - abs(s_e - rating_fact) / (METHOD["scale_max"] - 1)
+            experts.append({"expert": ex, "S_e": s_e, "acc": acc, "old": old, "new": new,
                             "applied": h is not None})
 
-    dist = {k: sum(f.rating == k for f in fbs) for k in range(5, 0, -1)}
+    dist = {k: sum(f.rating == k for f in fbs) for k in range(METHOD["scale_max"], 0, -1)}
     return {"rows": rows, "fc": fc, "accuracy": accuracy(rows), "in_range": in_range,
-            "feedback": {"n": len(fbs), "avg": guest_avg, "nps": nps([f.nps for f in fbs if f.nps is not None]),
+            "feedback": {"n": len(fbs), "avg": guest_avg,
+                         "V": guest_var["V"] if guest_var else None,
+                         "nps": nps([f.nps for f in fbs if f.nps is not None]),
                          "dist": dist, "comments": [f for f in fbs if f.comment][:8]},
-            "rating_fact": rating_fact, "stations": stations, "experts": experts,
+            "rating_fact": rating_fact, "stations": stations, "experts": experts, "timing": timing,
+            "timing_filled": filled, "timing_total": (scn_total, fact_total),
             "has_expertise": bool(rnd), "done": bool(res and res.reviewed_at)}

@@ -2,11 +2,11 @@
   <div class="wrap cols">
     <div>
       <p><b>Energy Lab</b> — направление педагогического отряда ENERGY (ООО «ФОЛЛОУ-МИ»).</p>
-      <p><a href="/privacy">Политика обработки персональных данных</a></p>
+      <p><a href="/faq">Вопросы и ответы</a> · <a href="/privacy">Политика обработки персональных данных</a></p>
     </div>
     <div>
-      <p><a href="https://vk.ru/planeta.energy" rel="noopener">ВКонтакте</a> · Telegram-канал ENERGY</p>
-      <p class="small">Instagram (принадлежит Meta — организация признана экстремистской и запрещена в России).</p>
+      {% with full = True %}{% include "partials/socials.html" %}{% endwith %}
+      {% if social_links()|selectattr('key', 'equalto', 'instagram')|list %}<p class="small muted">* {{ META_NOTE }}</p>{% endif %}
     </div>
   </div>
 </footer>

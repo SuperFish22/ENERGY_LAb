@@ -1,0 +1,38 @@
+{% extends "cabinet/_layout.html" %}{% set nav = 'faq' %}
+{% block page_title %}Вопросы и ответы{% endblock %}
+{% block main %}
+<header><div><h1 style="font-size:2rem;margin:0">Вопросы и ответы</h1>
+<p class="muted">Опубликованные вопросы видны на странице <a href="/faq" target="_blank" rel="noopener">«Вопросы и ответы»</a> и в боте по команде <b>/faq</b>. Бот сам подсказывает похожий ответ, когда гость пишет в поддержку. Черновики видите только вы.</p></div></header>
+<datalist id="faq-topics">{% for t in topics %}<option value="{{ t }}">{% endfor %}</datalist>
+
+{% for f in items %}
+<form method="post" action="/cabinet/admin/faq/{{ f.id }}" class="panel faq-edit" id="f{{ f.id }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <div class="grid-3">
+    <div class="field" style="grid-column:span 2"><label for="q{{ f.id }}">Вопрос</label><input id="q{{ f.id }}" name="question" value="{{ f.question }}" required maxlength="300"></div>
+    <div class="field"><label for="t{{ f.id }}">Тема</label><input id="t{{ f.id }}" name="topic" value="{{ f.topic }}" list="faq-topics" maxlength="40"></div>
+  </div>
+  <div class="field"><label for="a{{ f.id }}">Ответ</label><textarea id="a{{ f.id }}" name="answer" required maxlength="4000">{{ f.answer }}</textarea></div>
+  <div class="row-actions">
+    <label class="scn-check"><input type="checkbox" name="is_published" value="1" {% if f.is_published %}checked{% endif %}> Опубликован</label>
+    <button class="btn btn-small btn-launch" name="action" value="save">Сохранить</button>
+    <button class="btn btn-small" name="action" value="up" aria-label="Выше" {% if loop.first %}disabled{% endif %}>↑</button>
+    <button class="btn btn-small" name="action" value="down" aria-label="Ниже" {% if loop.last %}disabled{% endif %}>↓</button>
+    <button class="btn btn-small" name="action" value="delete">Удалить</button>
+    {% if not f.is_published %}<span class="status status-rework">черновик</span>{% endif %}
+    {% if f.question_id %}<span class="small muted">из доски вопросов</span>{% endif %}
+  </div>
+</form>
+{% else %}<p class="empty">Вопросов пока нет. Добавьте первый ниже или перенесите отвеченный вопрос с доски.</p>{% endfor %}
+
+<form method="post" action="/cabinet/admin/faq" class="panel" id="new">
+  <h2>Новый вопрос</h2>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <div class="grid-3">
+    <div class="field" style="grid-column:span 2"><label for="nq">Вопрос</label><input id="nq" name="question" required maxlength="300" placeholder="Например: Можно ли вернуть билет?"></div>
+    <div class="field"><label for="nt">Тема</label><input id="nt" name="topic" list="faq-topics" maxlength="40" value="Общие вопросы"></div>
+  </div>
+  <div class="field"><label for="na">Ответ</label><textarea id="na" name="answer" required maxlength="4000"></textarea></div>
+  <div class="row-actions"><label class="scn-check"><input type="checkbox" name="is_published" value="1" checked> Сразу опубликовать</label><button class="btn btn-launch">Добавить</button></div>
+</form>
+{% endblock %}

@@ -1,0 +1,23 @@
+{#- Доска задач: 4 фиксированные колонки (ЧТЗ М06-13). Нужны: columns, statuses, user, csrf_token, back, archived. -#}
+<div class="board" data-board data-csrf="{{ csrf_token }}">
+  {% for key, name in statuses.items() %}
+  <section class="bcol bcol-{{ key }}" data-col="{{ key }}" aria-labelledby="bh-{{ key }}">
+    <header class="bcol-head"><h2 id="bh-{{ key }}">{{ name }}</h2><span class="bcol-count" data-count>{{ columns[key]|length }}</span></header>
+    <div class="bcol-list" data-list>
+      {% for t in columns[key] %}{% include "cabinet/_task_card.html" %}{% endfor %}
+      <p class="bcol-empty" data-empty {% if columns[key] %}hidden{% endif %}>{% if key == 'todo' %}Новых задач нет{% elif key == 'in_progress' %}Сейчас никто не работает над задачами{% elif key == 'review' %}Нечего проверять{% else %}За 14 дней ничего не закрыто{% endif %}</p>
+    </div>
+    {% if key == 'done' and archived %}<a class="bcol-more" href="{{ qurl(flag='archive', view='list') }}">Архив: ещё {{ archived }}</a>{% endif %}
+  </section>
+  {% endfor %}
+</div>
+<p class="sr" role="status" aria-live="polite" data-board-status></p>
+<dialog class="return-dialog" data-return-dialog aria-labelledby="rd-title">
+  <form method="dialog">
+    <h2 id="rd-title">Вернуть в работу</h2>
+    <label for="rd-text">Что исправить</label>
+    <textarea id="rd-text" rows="3" maxlength="500" required></textarea>
+    <div class="row-actions"><button class="btn btn-launch" value="ok">Вернуть</button><button class="btn" value="cancel" formnovalidate>Отмена</button></div>
+  </form>
+</dialog>
+<script src="/static/js/board.js?v={{ ASSET_V }}" defer></script>

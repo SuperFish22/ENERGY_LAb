@@ -1,0 +1,11 @@
+{#- Ссылки на соцсети из «Главная страница → Соцсети». Без логотипов брендов: короткие подписи. full=True — с названиями. -#}
+{#- Instagram — только в подвале, где рядом обязательная пометка о Meta -#}
+{%- set links = social_links() if full else social_links()|rejectattr('key', 'equalto', 'instagram')|list -%}
+{%- if links -%}
+<ul class="socials{% if full %} socials-full{% endif %}" aria-label="Мы в соцсетях">
+  {%- for s in links %}
+  <li><a class="soc soc-{{ s.key }}" href="{{ s.url }}" target="_blank" rel="noopener noreferrer" {% if not full %}aria-label="{{ s.name }}" title="{{ s.name }}"{% endif %}>
+    <span class="soc-mark" aria-hidden="true">{{ {'vk': 'VK', 'telegram': 'TG', 'instagram': 'IG', 'youtube': 'YT'}[s.key] }}</span>{% if full %}<span>{{ s.name }}{% if s.key == 'instagram' %}*{% endif %}</span>{% endif %}</a></li>
+  {%- endfor %}
+</ul>
+{%- endif -%}

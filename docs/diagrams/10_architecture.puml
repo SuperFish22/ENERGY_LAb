@@ -1,0 +1,60 @@
+@startuml
+!include _style.iuml
+left to right direction
+skinparam nodesep 30
+skinparam ranksep 80
+skinparam defaultFontSize 14
+rectangle "Клиенты" as Z1 {
+  node "Устройство пользователя" {
+    artifact "Браузер" as Browser
+    artifact "Telegram /\nВКонтакте" as Msg
+  }
+}
+rectangle "Граница обработки персональных данных (152-ФЗ)" as PD #line.bold;line.dashed {
+  node "Сервер в РФ (Ubuntu, Docker)" as RU {
+    component "Nginx\n(TLS, статика, доступ\nк /api/bot/ только с IP бота)" as Nginx
+    component "Веб-приложение FastAPI\n(сайт, кабинет, API бота)" as App
+    component "Модуль методики\n(экспертиза, прогноз,\nитоговая оценка)" as Exp
+    database "PostgreSQL 16" as DB
+    folder "media/ (фото)\nfiles/ (документы)" as FS
+    component "cron: резервная копия,\nочистка ПДн" as Cron
+  }
+}
+rectangle "Внешние сервисы" as Z3 {
+  node "Внешний сервер" as EXT {
+    component "Бот (Python,\nlong polling)" as Bot
+    component "n8n\n(выгрузка в Google)" as N8N
+  }
+  cloud "Telegram Bot API /\nVK Long Poll" as MAPI
+  cloud "Timepad\n(билеты, 54-ФЗ)" as TP
+  cloud "Google Таблицы\nи Документы" as GG
+  cloud "GitHub Actions\n(проверка, выкладка)" as GH
+}
+Browser --> Nginx : HTTPS
+Nginx --> App : HTTP (внутр. сеть Docker)
+App --> Exp : вызов функций
+App --> DB : SQL (TCP 5432)
+Exp --> DB : SQL
+App --> FS : файловый ввод-вывод
+Cron --> DB : pg_dump / SQL
+Browser ..> TP : HTTPS, виджет покупки
+Msg --> MAPI : HTTPS
+Bot <--> MAPI : HTTPS long polling
+Bot --> Nginx : HTTPS /api/bot/*\nBearer-токен
+N8N --> Nginx : HTTPS /api/bot/export/*
+N8N --> GG : HTTPS (OAuth)
+GH ..> RU : SSH, выкладка
+GH ..> EXT : SSH, выкладка бота
+
+legend bottom left
+  <b>Обозначения</b>
+  | объёмный блок | сервер или устройство |
+  | прямоугольник с выступами | программный компонент |
+  | цилиндр | база данных |
+  | папка | файловое хранилище |
+  | облако | внешний интернет-сервис |
+  | жирная пунктирная рамка | граница обработки персональных данных |
+  | сплошная стрелка | обмен данными (подпись — протокол) |
+  | пунктирная стрелка | обращение по требованию или служебный доступ |
+endlegend
+@enduml

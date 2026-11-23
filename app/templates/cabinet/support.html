@@ -1,0 +1,18 @@
+{% extends "cabinet/_layout.html" %}{% set nav = 'support' %}
+{% block page_title %}Поддержка{% endblock %}
+{% block main %}
+<h1 style="font-size:2rem">Поддержка</h1>
+<p class="muted">Покупатели и гости пишут боту ENERGY в Telegram или ВКонтакте — без регистрации. Каждое сообщение приходит операторам на сайт и в мессенджер с меткой <b>#диалог</b>: отвечать можно здесь или прямо в своём Telegram, ответив (reply) на сообщение бота. Человек видит ответ от имени бота, ваш личный аккаунт ему не виден.</p>
+{% if not user.telegram_id and not user.vk_id %}<p class="flash warn small">Чтобы получать обращения в мессенджер и отвечать оттуда, привяжите бота: <a href="/cabinet/profile#bot">«Профиль» → «Бот и уведомления»</a>.</p>{% endif %}
+<p class="small muted">Сейчас обращения получают: {% for o in operators %}{{ o.full_name }}{% if not loop.last %}, {% endif %}{% endfor %}{% if operators and not operators[0].has_role('support') %} — роль «Поддержка» пока никому не выдана, поэтому обращения идут руководителям{% endif %}.</p>
+<nav class="tabs" aria-label="Фильтр"><a href="/cabinet/support" {% if not status %}aria-current="page"{% endif %}>Активные</a>{% for k, v in statuses.items() %}<a href="?status={{ k }}" {% if status == k %}aria-current="page"{% endif %}>{{ v }}</a>{% endfor %}</nav>
+<div class="sup-list">
+{% for c in chats %}{% set last = c.last %}
+  <a class="sup-row{% if c.status == 'open' %} is-open{% endif %}" href="/cabinet/support/{{ c.id }}">
+    <span class="sup-who"><b>{{ c.name or 'Гость' }}</b> <span class="muted small">#диалог{{ c.id }} · {{ 'Telegram' if c.channel == 'telegram' else 'ВКонтакте' }}</span></span>
+    <span class="sup-last">{% if last %}{% if last.direction == 'out' %}<span class="muted">Вы: </span>{% endif %}{{ last.text|truncate(140) }}{% endif %}</span>
+    <span class="sup-meta"><span class="status {{ 'status-rework' if c.status == 'open' else 'status-done' if c.status == 'answered' else '' }}">{{ c.status_name }}</span> <span class="muted small">{{ c.updated_at.strftime('%d.%m %H:%M') }}</span></span>
+  </a>
+{% else %}<p class="empty">{% if status %}Таких диалогов нет.{% else %}Новых обращений нет. Когда кто-то напишет боту, диалог появится здесь, а вам придёт уведомление.{% endif %}</p>{% endfor %}
+</div>
+{% endblock %}

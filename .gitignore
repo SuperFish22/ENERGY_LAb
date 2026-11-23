@@ -6,3 +6,9 @@ __pycache__/
 .coverage
 backups/
 media/
+files/
+graphify-out/
+strix_runs/
+venv/
+.venv/
+_to_delete/

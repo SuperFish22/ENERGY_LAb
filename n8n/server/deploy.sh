@@ -61,6 +61,13 @@ docker cp "$TMP/new" "$C:/tmp/elab/new" >/dev/null
 docker exec -u root "$C" chown -R node:node /tmp/elab/new        # docker cp кладёт файлы от чужого пользователя
 docker exec "$C" n8n import:workflow --separate --input=/tmp/elab/new
 
+# Telegram-бот, доставка уведомлений и VK с 17.11.2026 работают в Python-сервисе bot/ — старые сценарии выключаем,
+# иначе n8n снова поставит вебхук на тот же токен и будет перехватывать сообщения у бота.
+for id in elabTelegramBot1 elabNotifyOutbox elabVkInbound001; do
+  docker exec "$C" n8n unpublish:workflow --id="$id" >/dev/null 2>&1 \
+    || docker exec "$C" n8n update:workflow --id="$id" --active=false >/dev/null 2>&1 || true
+done
+
 echo "4/4 Включаю сценарии, которые были включены, и перезапускаю n8n"
 while read -r id; do
   [ -n "$id" ] || continue

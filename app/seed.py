@@ -70,6 +70,44 @@ def seed_reference(db: Session) -> None:
         sc = db.scalar(select(m.Department).where(m.Department.code == "SC"))
         db.add(m.Expert(user_id=admin.id, department_id=sc.id, competence=1.0))
     db.commit()
+    seed_faq(db)
+
+
+# Стартовые вопросы раздела «Вопросы и ответы». Создаются один раз; дальше их правят в кабинете.
+FAQ_START = [
+    ("Билеты и оплата", "Как купить билет?",
+     "Откройте мероприятие в «Афише» и нажмите «Купить билет». Билеты продаёт Timepad: оплата картой или СБП, "
+     "электронный билет и чек придут на почту."),
+    ("Билеты и оплата", "Можно ли вернуть билет?",
+     "Да, через Timepad по правилам возврата: полная стоимость — не позднее чем за 10 дней до мероприятия, 50 % — "
+     "за 5–10 дней, 30 % — за 3–5 дней. Если не получается — напишите нам в бот, поможем."),
+    ("На мероприятии", "С какого возраста можно прийти?",
+     "Возрастная отметка указана на карточке каждого мероприятия в «Афише» (например, 12+ или 16+). Если сомневаетесь, "
+     "подойдёт ли формат вашему ребёнку, — спросите в боте."),
+    ("На мероприятии", "Что делать, если что-то случилось во время мероприятия?",
+     "Подойдите к любому вожатому или организатору — они на площадке всё время. При угрозе жизни или здоровью "
+     "звоните 112."),
+    ("Заказ мероприятия", "Можно ли заказать тусовку на свой праздник?",
+     "Да. На странице «Заказать мероприятие» выберите повод и формат, калькулятор покажет предварительную стоимость. "
+     "Оставьте заявку — продюсер свяжется с вами в течение двух рабочих дней и пришлёт смету."),
+    ("Заказ мероприятия", "От чего зависит стоимость?",
+     "От числа гостей, длительности программы, формата и дополнительных услуг: площадка, фотограф, DJ, декор. "
+     "Калькулятор на сайте даёт ориентир, точную смету готовит продюсерский отдел."),
+    ("Общие вопросы", "Где посмотреть фото с прошедших мероприятий?",
+     "В разделе «Альбом» на сайте. Фото гостей публикуются только с их согласия."),
+    ("Общие вопросы", "Как задать вопрос, если ответа здесь нет?",
+     "Напишите боту ENERGY в Telegram или ВКонтакте обычным сообщением — без регистрации. Ответит живой оператор, "
+     "ответ придёт туда же."),
+]
+
+
+def seed_faq(db: Session) -> None:
+    if db.get(m.SiteSetting, "faq_seeded") or db.scalar(select(m.FaqItem.id).limit(1)):
+        return
+    for k, (topic, q, a) in enumerate(FAQ_START):
+        db.add(m.FaqItem(topic=topic, question=q, answer=a, order_no=k, is_published=True))
+    db.add(m.SiteSetting(key="faq_seeded", value=True))
+    db.commit()
 
 
 def _user(db, name, email, roles, dept=None, comp=0.7):
@@ -138,8 +176,27 @@ def _demo_avatar(k: int, a: str, b: str) -> str:
     return f"demo/{name}"
 
 
+def _demo_support(db: Session) -> None:
+    """Оператор поддержки и пример диалога (можно добавить и в уже заполненную базу)."""
+    op = _user(db, "Оператор поддержки", "support@energy.local", ["support"])
+    if not db.scalar(select(m.SupportChat.id).limit(1)):
+        chat = m.SupportChat(channel="telegram", chat_id="100000001", name="Анна (демо)", status="answered",
+                             operator_id=op.id)
+        db.add(chat)
+        db.flush()
+        db.add_all([
+            m.SupportMessage(chat_id=chat.id, direction="in", source="telegram",
+                             text="Здравствуйте! Хотим квест на день рождения сына, 12 лет, человек 15. Это реально?"),
+            m.SupportMessage(chat_id=chat.id, direction="out", author_id=op.id, source="web",
+                             text="Здравствуйте! Да, конечно. Оставьте заявку на странице «Заказать мероприятие» — "
+                                  "калькулятор сразу покажет примерную стоимость, а продюсер пришлёт смету."),
+        ])
+    db.commit()
+
+
 def seed_demo(db: Session) -> None:
     """ДЕМО-данные для показа и тестов. Названия прошлых мероприятий реальные, цифры — условные."""
+    _demo_support(db)
     if db.scalar(select(m.Event).where(m.Event.code == "LAB-2026-01")):
         return
     fmt = {f.code: f for f in db.scalars(select(m.EventFormat))}
@@ -156,10 +213,10 @@ def seed_demo(db: Session) -> None:
         _user(db, "Участник Lab", "member@energy.local", ["member"]),
     ]
     past = [  # код, название, формат, дата, площадка, цена, гости, продано, план, факт, рейтинг
-        ("LAB-2026-01", "Велесовы тропы", "12", date(2026, 2, 22), venue, 500, 45, 45, 2000, 1985, 4.6),
-        ("LAB-2026-02", "Не та сказка", "21", date(2026, 5, 1), camp, 0, 40, 40, 6000, 6400, 4.7),
-        ("LAB-2026-03", "Алое восстание", "31", date(2026, 5, 2), camp, 0, 38, 38, 5000, 5300, 4.4),
-        ("LAB-2026-04", "Секреты Ренессанса", "22", date(2026, 5, 16), venue, 0, 50, 50, 4000, 4300, 4.5),
+        ("LAB-2026-01", "Велесовы тропы", "12", date(2026, 2, 22), venue, 500, 45, 45, 2000, 1985, 9.1),
+        ("LAB-2026-02", "Не та сказка", "21", date(2026, 5, 1), camp, 0, 40, 40, 6000, 6400, 9.3),
+        ("LAB-2026-03", "Алое восстание", "31", date(2026, 5, 2), camp, 0, 38, 38, 5000, 5300, 8.7),
+        ("LAB-2026-04", "Секреты Ренессанса", "22", date(2026, 5, 16), venue, 0, 50, 50, 4000, 4300, 8.9),
     ]
     for code, title, f, d, v, price, guests, sold, plan, fact, rating in past:
         ev = m.Event(code=code, title=title, format_id=fmt[f].id, venue_id=v.id, author_id=users[0].id,
@@ -170,7 +227,7 @@ def seed_demo(db: Session) -> None:
         db.add(m.EventResult(event_id=ev.id, guests_count=guests, tickets_sold=sold, revenue=price * sold,
                              actual_cost=fact, avg_rating=rating, reviewed_at=datetime.combine(d, time(23, 0)),
                              lessons="ДЕМО: замените реальными выводами разбора полёта."))
-        db.add(m.Forecast(event_id=ev.id, expert_score=round(rating - 0.3, 2), recommendation="Утвердить"))
+        db.add(m.Forecast(event_id=ev.id, expert_score=round(rating - 0.6, 2), recommendation="Утвердить"))
         pal = DEMO_ART[int(code[-2:]) % len(DEMO_ART)]
         for k in range(3):
             db.add(m.EventPhoto(event_id=ev.id, file=_demo_cover(code, title, k, pal), order_no=k, is_cover=k == 0,
@@ -191,9 +248,24 @@ def seed_demo(db: Session) -> None:
                     description="DJ-сет, космический дресс-код и фотозона.")
     db.add_all([upcoming, draft, party])
     db.flush()
-    for ev, stations in ((upcoming, [("Вход в музей", 15, 3000), ("Лаборатория алхимика", 25, 5500),
-                                     ("Зал реликвии", 20, 4000)]),
-                         (draft, [("Разминка", 15, 1000), ("Музыкальный раунд", 20, 3000), ("Финал", 20, 2000)])):
+    # «Ночь в музее» — сценарий по времени (spec 002): сбор, легенда, карусель залов группами, финал
+    upcoming.slot_min = 150
+    S = m.Station
+    gather = S(event_id=upcoming.id, order_no=1, kind="service", rated=False, title="Сбор гостей и деление на группы",
+               duration_min=15, cost=0, responsible_id=users[1].id)
+    legend = S(event_id=upcoming.id, order_no=2, kind="block", title="Легенда: экспонаты оживают", duration_min=10,
+               cost=1500, responsible_id=users[0].id, description="Смотритель встречает гостей и просит о помощи")
+    tour = S(event_id=upcoming.id, order_no=3, kind="carousel", rated=False, title="Ночная экскурсия по залам",
+             duration_min=0, cost=0, groups=3, transition_min=3)
+    final = S(event_id=upcoming.id, order_no=4, kind="block", title="Финал: возвращение реликвии", duration_min=15,
+              cost=2000, responsible_id=users[0].id)
+    db.add_all([gather, legend, tour, final])
+    db.flush()
+    for i, (t, dur, cost) in enumerate([("Вход в музей", 15, 3000), ("Лаборатория алхимика", 25, 5500),
+                                        ("Зал реликвии", 20, 4000)], 1):
+        db.add(S(event_id=upcoming.id, parent_id=tour.id, kind="station", order_no=i, title=t, duration_min=dur,
+                 cost=cost, responsible_id=users[3].id))
+    for ev, stations in ((draft, [("Разминка", 15, 1000), ("Музыкальный раунд", 20, 3000), ("Финал", 20, 2000)]),):
         for i, (t, dur, cost) in enumerate(stations, 1):
             db.add(m.Station(event_id=ev.id, order_no=i, title=t, duration_min=dur, cost=cost,
                              responsible_id=users[3].id))
@@ -206,7 +278,25 @@ def seed_demo(db: Session) -> None:
                due_date=date.today() + timedelta(days=3)),
         m.Task(event_id=upcoming.id, department_id=depts["SC"].id, title="Финальная версия текста станции 2",
                assignee_id=users[2].id, author_id=users[0].id, due_date=date.today() + timedelta(days=7)),
+        # доска задач: по карточке в каждой колонке, просроченная, без срока, срочная
+        m.Task(event_id=upcoming.id, department_id=depts["PROD"].id, title="Подтвердить площадку и время заезда",
+               assignee_id=users[1].id, author_id=users[0].id, status="in_progress", priority="high",
+               due_date=date.today() - timedelta(days=2)),
+        m.Task(event_id=upcoming.id, department_id=depts["SC"].id, title="Загадки для станции «Реликвия»",
+               assignee_id=users[2].id, author_id=users[1].id, status="review",
+               due_date=date.today() + timedelta(days=1)),
+        m.Task(event_id=upcoming.id, department_id=depts["DIR"].id, title="Расписать тайминг прогона",
+               assignee_id=users[0].id, author_id=users[1].id, status="done",
+               due_date=date.today() - timedelta(days=1), done_at=datetime.now() - timedelta(days=1)),
+        m.Task(department_id=depts["SMI"].id, title="Собрать фото с прошлой тусовки для поста",
+               assignee_id=users[4].id, author_id=users[4].id),
+        m.Task(event_id=upcoming.id, department_id=depts["TECH"].id, title="Список света и звука для площадки",
+               assignee_id=users[3].id, author_id=users[1].id, status="review",
+               due_date=date.today() + timedelta(days=4)),
     ])
+    db.flush()
+    for i, t in enumerate(db.scalars(select(m.Task).order_by(m.Task.id)), 1):
+        t.position = i * 1000
     crew = [("Александр Рыбаков", "Руководитель Energy Lab", "SC", "Придумывает форматы и отвечает за цифровую часть"),
             ("Олег Шведков", "Руководитель, режиссёр", "DIR", "Ставит программы и держит темп всей тусовки"),
             ("Катя", "Руководитель, продюсер", "PROD", "Находит площадки, партнёров и собирает смету"),

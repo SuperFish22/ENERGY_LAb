@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Заказать мероприятие — Energy Lab{% endblock %}
+{% block description %}Заявка на мероприятие под ключ от Energy Lab: день рождения, выпускной, корпоратив. Калькулятор предварительной стоимости.{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/css/home.css?v={{ ASSET_V }}">{% endblock %}
+{% block body %}
+{% include "partials/public_top.html" %}
+<main class="wrap order-page">
+  <header class="order-head">
+    <h1>Заказать мероприятие</h1>
+    <p class="order-lead">{{ texts.request_intro }}</p>
+    <ol class="mini-steps order-steps">
+      <li>Вы оставляете заявку</li><li>Продюсер уточняет детали и бюджет</li><li>Команда собирает сценарий и смету</li><li>Мероприятие и фотоальбом</li>
+    </ol>
+    <a class="order-jump" href="#price">Сначала посчитать стоимость</a>
+  </header>
+
+  <div class="order-grid">
+    <form id="request" class="card-glass request-form" method="post" action="/request" novalidate>
+      <h2>Заявка</h2>
+      {% include "partials/flash.html" %}
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="hp" aria-hidden="true"><label for="rq-web">Сайт</label><input id="rq-web" name="website" tabindex="-1" autocomplete="off"></div>
+      <div class="field"><label for="rq-name">Как к вам обращаться</label><input id="rq-name" name="name" required maxlength="150" autocomplete="name" value="{{ rf.name or '' }}"></div>
+      <fieldset class="order-contacts">
+        <legend>Как с вами связаться <span class="muted">— достаточно одного способа</span></legend>
+        <div class="grid-2">
+          <div class="field"><label for="rq-contact">Телефон или e-mail</label><input id="rq-contact" name="contact" maxlength="150" autocomplete="tel" value="{{ rf.contact or '' }}"></div>
+          <div class="field"><label for="rq-tg">Telegram</label>
+            <div class="tg-input"><span aria-hidden="true">t.me/</span><input id="rq-tg" name="telegram" maxlength="60" autocomplete="off" spellcheck="false" placeholder="ваш_ник" aria-describedby="rq-tg-hint" value="{{ rf.telegram or '' }}"></div>
+            <span class="small muted" id="rq-tg-hint">Можно вставить ссылку на профиль или ник с «@»</span></div>
+        </div>
+      </fieldset>
+      <div class="grid-2">
+        <div class="field"><label for="rq-occ">Повод</label><select id="rq-occ" name="occasion">{% for o in occasions %}<option {% if rf.occasion == o %}selected{% endif %}>{{ o }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="rq-fmt">Формат</label><select id="rq-fmt" name="format_id"><option value="">Подскажите, что лучше</option>{% for f in formats %}<option value="{{ f.id }}" data-group="{{ f.group_name }}" {% if rf.format_id == f.id|string %}selected{% endif %}>{{ f.name }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="rq-date">Желаемая дата</label><input id="rq-date" name="wish_date" type="date" value="{{ rf.wish_date or '' }}"></div>
+        <div class="field"><label for="rq-guests">Сколько гостей</label><input id="rq-guests" name="guests" type="number" min="1" max="1000" required value="{{ rf.guests or 20 }}"></div>
+        <div class="field"><label for="rq-age">Возраст гостей</label><select id="rq-age" name="age_group"><option value="">—</option>{% for a in age_groups %}<option {% if rf.age_group == a %}selected{% endif %}>{{ a }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="rq-budget">Бюджет, ₽ (если знаете)</label><input id="rq-budget" name="budget" inputmode="numeric" value="{{ rf.budget or '' }}"></div>
+      </div>
+      <div class="field"><label for="rq-msg">Расскажите об идее</label><textarea id="rq-msg" name="message" maxlength="2000" placeholder="Например: день рождения сына, 14 лет, любит фантастику; хотим квест на 2–3 часа">{{ rf.message or '' }}</textarea></div>
+      <label class="consent"><input type="checkbox" name="consent" value="1" required><span>Согласен на обработку персональных данных для ответа на заявку по <a href="/privacy">политике обработки персональных данных</a></span></label>
+      <button class="btn btn-flame">Отправить заявку</button>
+    </form>
+
+    <aside id="price" class="card-glass order-price" aria-labelledby="price-h">
+      <h2 id="price-h">Сколько это стоит</h2>
+      <div class="formula" aria-label="Формула стоимости">
+        <span class="f-part c1">Материалы × гости</span><span class="f-op">+</span><span class="f-part c2">Команда × часы</span><span class="f-op">+</span><span class="f-part c3">Доп. услуги</span><span class="f-op">+</span><span class="f-part c4">{{ (pricing.margin*100)|round|int }}% на развитие Lab</span>
+      </div>
+      <div class="calc" data-calc='{{ {"rates": rates, "team": pricing.team_per_hour, "minGuests": pricing.min_guests, "margin": pricing.margin, "options": pricing.options}|tojson }}'>
+        <div class="calc-inputs">
+          <div class="field"><label for="c-group">Формат</label><select id="c-group">{% for g in groups %}<option {% if g == 'Квестовые' %}selected{% endif %}>{{ g }}</option>{% endfor %}</select>
+            <span class="small muted" data-source></span></div>
+          <div class="field"><label for="c-guests">Гостей: <b data-out="guests">20</b></label><input id="c-guests" type="range" min="5" max="150" step="1" value="20"></div>
+          <div class="field"><label for="c-hours">Длительность: <b data-out="hours">{{ pricing.hours_default }}</b> ч</label><input id="c-hours" type="range" min="1" max="6" step="0.5" value="{{ pricing.hours_default }}"></div>
+          <fieldset class="calc-opts"><legend>Дополнительно</legend>
+            {% for key, opt in pricing.options.items() %}<label><input type="checkbox" value="{{ key }}" {% if loop.first %}checked{% endif %}> {{ opt[0] }} <span class="muted">{{ opt[1]|money }}</span></label>{% endfor %}
+          </fieldset>
+        </div>
+        <div class="calc-result" aria-live="polite">
+          <p class="calc-total"><span data-total>{{ sample.total|money }}</span><small data-per>≈ {{ sample.per_guest|money }} с гостя</small></p>
+          <div class="calc-bar" data-bar></div>
+          <ul class="calc-lines" data-lines>{% for n, v in sample.lines %}<li><span>{{ n }}</span><b>{{ v|money }}</b></li>{% endfor %}</ul>
+          <a class="btn btn-glass" href="#request" data-to-request>Перенести расчёт в заявку</a>
+        </div>
+      </div>
+      <p class="small muted order-note">Материалы на гостя считаются по нашим прошедшим мероприятиям того же формата. В расчёте минимум {{ pricing.min_guests }} гостей, ведущие и актёры — {{ pricing.team_per_hour|money }} за час. Это предварительная оценка: точную смету пришлёт продюсер после разговора с вами.</p>
+    </aside>
+  </div>
+</main>
+{% include "partials/public_foot.html" %}
+<script src="/static/js/home.js?v={{ ASSET_V }}" defer></script>
+{% endblock %}

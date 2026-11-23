@@ -1,0 +1,69 @@
+skinparam defaultFontName "Inter"
+skinparam defaultFontSize 13
+skinparam defaultFontColor #1F2433
+skinparam shadowing false
+skinparam backgroundColor white
+skinparam roundCorner 14
+skinparam ArrowColor #3A4256
+skinparam ArrowFontSize 11
+skinparam ArrowFontColor #3A4256
+skinparam dpi 150
+skinparam legendBackgroundColor #FFFFFF
+skinparam legendBorderColor #7C8597
+skinparam legendFontSize 12
+skinparam noteBackgroundColor #FBEFD9
+skinparam noteBorderColor #C98A12
+skinparam usecase {
+  BackgroundColor #E6EEFB
+  BorderColor #2F6FD1
+}
+skinparam actor {
+  BackgroundColor #ECE8FB
+  BorderColor #6B4FD0
+}
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #7C8597
+}
+skinparam package {
+  BackgroundColor #FFFFFF
+  BorderColor #7C8597
+  FontColor #3A4256
+}
+skinparam state {
+  BackgroundColor #E6EEFB
+  BorderColor #2F6FD1
+  StartColor #2E9A5F
+  EndColor #C2306B
+}
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #6B4FD0
+  HeaderBackgroundColor #ECE8FB
+  AttributeFontSize 12
+}
+skinparam entity {
+  BackgroundColor #FFFFFF
+  BorderColor #6B4FD0
+}
+skinparam sequence {
+  LifeLineBorderColor #7C8597
+  LifeLineBackgroundColor #E0F3E8
+  ParticipantBackgroundColor #E6EEFB
+  ParticipantBorderColor #2F6FD1
+  ActorBackgroundColor #ECE8FB
+  ActorBorderColor #6B4FD0
+  DatabaseBackgroundColor #ECE8FB
+  DatabaseBorderColor #6B4FD0
+  GroupBackgroundColor #FBEFD9
+  GroupBorderColor #C98A12
+  BoxBorderColor #7C8597
+}
+skinparam component {
+  BackgroundColor #E0F3E8
+  BorderColor #2E9A5F
+}
+skinparam database {
+  BackgroundColor #ECE8FB
+  BorderColor #6B4FD0
+}

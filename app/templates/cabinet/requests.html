@@ -1,14 +1,14 @@
 {% extends "cabinet/_layout.html" %}{% set nav = 'requests' %}
-{% block page_title %}Заявки на тусовки{% endblock %}
+{% block page_title %}Заявки на мероприятия{% endblock %}
 {% block main %}
-<h1 style="font-size:2rem">Заявки на тусовки</h1>
-<p class="muted">Заявки покупателей с главной страницы. Контакты видят только руководители; в бот и n8n они не уходят.</p>
+<h1 style="font-size:2rem">Заявки на мероприятия</h1>
+<p class="muted">Заявки покупателей со страницы «Заказать мероприятие». Контакты видят только руководители; в бот и n8n они не уходят.</p>
 <nav class="tabs" aria-label="Фильтр по статусу"><a href="/cabinet/requests" {% if not status %}aria-current="page"{% endif %}>Все</a>{% for k, v in statuses.items() %}<a href="?status={{ k }}" {% if status == k %}aria-current="page"{% endif %}>{{ v }}</a>{% endfor %}</nav>
 {% for r in items %}
 <section class="panel">
   <h2 style="font-size:1.15rem">№{{ r.id }} · {{ r.occasion }} · {{ r.guests }} гостей <span class="status {{ 'status-rework' if r.status == 'new' else 'status-done' if r.status == 'done' else '' }}">{{ statuses[r.status] }}</span></h2>
   <dl class="kpi">
-    <div><b>{{ r.name }}</b><span>{{ r.contact }}</span></div>
+    <div><b>{{ r.name }}</b><span>{{ r.contact or "" }}{% if r.contact and r.telegram %}<br>{% endif %}{% if r.telegram %}<a href="{{ r.telegram_url }}" target="_blank" rel="noopener noreferrer">Telegram: @{{ r.telegram }}</a>{% endif %}</span></div>
     <div><b>{{ r.wish_date|ru_date if r.wish_date else 'дата открыта' }}</b><span>желаемая дата</span></div>
     <div><b>{{ r.format.name if r.format else 'любой формат' }}</b><span>{{ r.age_group or 'возраст не указан' }}</span></div>
     <div><b>{{ r.estimate|money if r.estimate else '—' }}</b><span>оценка калькулятора{% if r.budget %} · бюджет {{ r.budget|money }}{% endif %}</span></div>

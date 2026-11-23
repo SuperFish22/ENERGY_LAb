@@ -1,0 +1,183 @@
+@startuml
+!include _style.iuml
+skinparam defaultFontSize 12
+hide circle
+hide methods
+skinparam linetype ortho
+entity roles {
+  *id : SERIAL <<PK>>
+  --
+  code : VARCHAR(20) <<UK>>
+  name : VARCHAR(100)
+}
+entity users {
+  *id : SERIAL <<PK>>
+  --
+  full_name : VARCHAR(150)
+  email : VARCHAR(120) <<UK>>
+  phone : VARCHAR(20)
+  telegram_id : BIGINT
+  password_hash : VARCHAR(255)
+  role_id : INT <<FK>>
+  is_active : BOOLEAN
+  created_at : TIMESTAMP
+}
+entity departments {
+  *id : SERIAL <<PK>>
+  --
+  code : VARCHAR(20) <<UK>>
+  name : VARCHAR(100)
+}
+entity experts {
+  *id : SERIAL <<PK>>
+  --
+  user_id : INT <<FK,UK>>
+  department_id : INT <<FK>>
+  competence : NUMERIC(3,2)
+  is_external : BOOLEAN
+  organization : VARCHAR(150)
+}
+entity event_formats {
+  *id : SERIAL <<PK>>
+  --
+  code : VARCHAR(10) <<UK>>
+  name : VARCHAR(100)
+}
+entity venues {
+  *id : SERIAL <<PK>>
+  --
+  name : VARCHAR(150)
+  address : VARCHAR(255)
+  capacity : INT
+}
+entity events {
+  *id : SERIAL <<PK>>
+  --
+  code : VARCHAR(20) <<UK>>
+  title : VARCHAR(200)
+  format_id : INT <<FK>>
+  venue_id : INT <<FK>>
+  author_id : INT <<FK>>
+  status : VARCHAR(20)
+  planned_date : DATE
+  age_rating : VARCHAR(4)
+  ticket_price : NUMERIC(10,2)
+  planned_budget : NUMERIC(12,2)
+  capacity : INT
+  description : TEXT
+  created_at : TIMESTAMP
+}
+entity stations {
+  *id : SERIAL <<PK>>
+  --
+  event_id : INT <<FK>>
+  order_no : SMALLINT
+  title : VARCHAR(150)
+  duration_min : SMALLINT
+  cost : NUMERIC(10,2)
+  responsible_id : INT <<FK>>
+}
+entity criteria {
+  *id : SERIAL <<PK>>
+  --
+  department_id : INT <<FK>>
+  code : VARCHAR(20) <<UK>>
+  name : VARCHAR(150)
+  weight : NUMERIC(4,3)
+  scale_max : SMALLINT
+}
+entity expertise_rounds {
+  *id : SERIAL <<PK>>
+  --
+  event_id : INT <<FK>>
+  round_no : SMALLINT
+  method : VARCHAR(10)
+  opened_at : TIMESTAMP
+  closed_at : TIMESTAMP
+  kendall_w : NUMERIC(4,3)
+}
+entity evaluations {
+  *id : SERIAL <<PK>>
+  --
+  round_id : INT <<FK>>
+  expert_id : INT <<FK>>
+  criterion_id : INT <<FK>>
+  station_id : INT <<FK>>
+  score : SMALLINT
+  comment : TEXT
+  created_at : TIMESTAMP
+}
+entity risk_assessments {
+  *id : SERIAL <<PK>>
+  --
+  station_id : INT <<FK>>
+  expert_id : INT <<FK>>
+  probability : SMALLINT
+  impact : SMALLINT
+  comment : TEXT
+}
+entity forecasts {
+  *id : SERIAL <<PK>>
+  --
+  event_id : INT <<FK>>
+  expert_score : NUMERIC(4,2)
+  attendance : INT
+  tickets_sold : INT
+  revenue : NUMERIC(12,2)
+  budget : NUMERIC(12,2)
+  avg_rating : NUMERIC(3,2)
+  failure_risk : NUMERIC(4,3)
+  analogs : JSONB
+  created_at : TIMESTAMP
+}
+entity event_results {
+  *id : SERIAL <<PK>>
+  --
+  event_id : INT <<FK,UK>>
+  guests_count : INT
+  tickets_sold : INT
+  revenue : NUMERIC(12,2)
+  actual_cost : NUMERIC(12,2)
+  avg_rating : NUMERIC(3,2)
+}
+entity tickets {
+  *id : SERIAL <<PK>>
+  --
+  event_id : INT <<FK>>
+  buyer_name : VARCHAR(150)
+  email : VARCHAR(120)
+  price : NUMERIC(10,2)
+  status : VARCHAR(20)
+  purchased_at : TIMESTAMP
+}
+entity feedback {
+  *id : SERIAL <<PK>>
+  --
+  event_id : INT <<FK>>
+  ticket_id : INT <<FK>>
+  station_id : INT <<FK>>
+  rating : SMALLINT
+  comment : TEXT
+  created_at : TIMESTAMP
+}
+roles ||--o{ users
+users ||--o| experts
+departments ||--o{ experts
+departments ||--o{ criteria
+event_formats ||--o{ events
+venues ||--o{ events
+users ||--o{ events
+events ||--|{ stations
+events ||--o{ expertise_rounds
+expertise_rounds ||--o{ evaluations
+experts ||--o{ evaluations
+criteria ||--o{ evaluations
+stations |o--o{ evaluations
+stations ||--o{ risk_assessments
+experts ||--o{ risk_assessments
+events ||--o{ forecasts
+events ||--o| event_results
+events ||--o{ tickets
+events ||--o{ feedback
+tickets |o--o{ feedback
+@enduml

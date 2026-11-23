@@ -1,0 +1,250 @@
+@startuml
+!include _style.iuml
+skinparam defaultFontSize 11
+hide circle
+hide methods
+skinparam linetype ortho
+
+entity attachments {
+  *id : INT <<PK>>
+  --
+  event_id : INT <<FK>>
+  task_id : INT <<FK>>
+  kind : VARCHAR(5)
+  title : VARCHAR(200)
+  category : VARCHAR(15)
+  file : VARCHAR(255)
+  original_name : VARCHAR(200)
+  size : INT
+  url : VARCHAR(500)
+  provider : VARCHAR(10)
+  uploaded_by : INT <<FK>>
+  created_at : TIMESTAMP
+}
+entity audit_log {
+  *id : INT <<PK>>
+  --
+  user_id : INT <<FK>>
+  action : VARCHAR(60)
+  object : VARCHAR(60)
+  details : TEXT
+  created_at : TIMESTAMP
+}
+entity calendar_feeds {
+  *id : INT <<PK>>
+  --
+  user_id : INT <<FK>>
+  token : VARCHAR(64) <<UK>>
+  enabled : BOOLEAN
+  consent_at : TIMESTAMP
+  created_at : TIMESTAMP
+}
+entity discussions {
+  *id : INT <<PK>>
+  --
+  department_id : INT <<FK>>
+  event_id : INT <<FK>>
+  title : VARCHAR(200)
+  author_id : INT <<FK>>
+  status : VARCHAR(10)
+  source : VARCHAR(10)
+  created_at : TIMESTAMP
+}
+entity event_photos {
+  *id : INT <<PK>>
+  --
+  event_id : INT <<FK>>
+  file : VARCHAR(255)
+  caption : VARCHAR(200)
+  order_no : SMALLINT
+  is_cover : BOOLEAN
+  uploaded_by : INT <<FK>>
+  created_at : TIMESTAMP
+}
+entity faq {
+  *id : INT <<PK>>
+  --
+  question : VARCHAR(300)
+  answer : TEXT
+  topic : VARCHAR(40)
+  order_no : INT
+  is_published : BOOLEAN
+  question_id : INT <<FK>>
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+entity inbox {
+  *id : INT <<PK>>
+  --
+  user_id : INT <<FK>>
+  kind : VARCHAR(12)
+  text : TEXT
+  link : VARCHAR(255)
+  task_id : INT <<FK>>
+  actor_id : INT <<FK>>
+  created_at : TIMESTAMP
+  read_at : TIMESTAMP
+}
+entity link_codes {
+  *id : INT <<PK>>
+  --
+  user_id : INT <<FK>>
+  code : VARCHAR(12) <<UK>>
+  expires_at : TIMESTAMP
+}
+entity messages {
+  *id : INT <<PK>>
+  --
+  discussion_id : INT <<FK>>
+  author_id : INT <<FK>>
+  text : TEXT
+  source : VARCHAR(10)
+  created_at : TIMESTAMP
+}
+entity notifications {
+  *id : INT <<PK>>
+  --
+  user_id : INT <<FK>>
+  channel : VARCHAR(10)
+  chat_id : VARCHAR(40)
+  text : TEXT
+  link : VARCHAR(255)
+  reply_markup : TEXT
+  created_at : TIMESTAMP
+  sent_at : TIMESTAMP
+}
+entity party_requests {
+  *id : INT <<PK>>
+  --
+  name : VARCHAR(150)
+  contact : VARCHAR(150)
+  telegram : VARCHAR(32)
+  occasion : VARCHAR(60)
+  format_id : INT <<FK>>
+  wish_date : DATE
+  guests : INT
+  age_group : VARCHAR(20)
+  budget : NUMERIC(12, 2)
+  estimate : NUMERIC(12, 2)
+  message : TEXT
+  status : VARCHAR(20)
+  manager_id : INT <<FK>>
+  note : TEXT
+  created_at : TIMESTAMP
+}
+entity questions {
+  *id : INT <<PK>>
+  --
+  text : TEXT
+  category : VARCHAR(30)
+  status : VARCHAR(20)
+  author_name : VARCHAR(150)
+  channel : VARCHAR(10)
+  channel_user_id : VARCHAR(40)
+  answer : TEXT
+  moderated_by : INT <<FK>>
+  created_at : TIMESTAMP
+}
+entity site_settings {
+  *key : VARCHAR(60) <<PK>>
+  --
+  value : JSON
+  updated_at : TIMESTAMP
+}
+entity support_chats {
+  *id : INT <<PK>>
+  --
+  channel : VARCHAR(10)
+  chat_id : VARCHAR(40)
+  name : VARCHAR(150)
+  status : VARCHAR(10)
+  operator_id : INT <<FK>>
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+entity support_messages {
+  *id : INT <<PK>>
+  --
+  chat_id : INT <<FK>>
+  direction : VARCHAR(3)
+  text : TEXT
+  author_id : INT <<FK>>
+  source : VARCHAR(10)
+  created_at : TIMESTAMP
+}
+entity task_events {
+  *id : INT <<PK>>
+  --
+  task_id : INT <<FK>>
+  user_id : INT <<FK>>
+  field : VARCHAR(20)
+  old_value : VARCHAR(50)
+  new_value : VARCHAR(50)
+  comment : TEXT
+  source : VARCHAR(10)
+  created_at : TIMESTAMP
+}
+entity tasks {
+  *id : INT <<PK>>
+  --
+  event_id : INT <<FK>>
+  department_id : INT <<FK>>
+  title : VARCHAR(200)
+  description : TEXT
+  assignee_id : INT <<FK>>
+  author_id : INT <<FK>>
+  status : VARCHAR(20)
+  due_date : DATE
+  created_at : TIMESTAMP
+  position : INT
+  priority : VARCHAR(10)
+  done_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+entity team_members {
+  *id : INT <<PK>>
+  --
+  full_name : VARCHAR(150)
+  role : VARCHAR(120)
+  department_id : INT <<FK>>
+  bio : VARCHAR(400)
+  photo : VARCHAR(255)
+  order_no : SMALLINT
+  is_public : BOOLEAN
+  consent : BOOLEAN
+  user_id : INT <<FK>>
+}
+entity users {
+  *id : INT <<PK>>
+}
+entity events {
+  *id : INT <<PK>>
+}
+discussions ||--o{ messages
+events ||--o{ attachments
+events ||--o{ discussions
+events ||--o{ event_photos
+events ||--o{ tasks
+questions ||--o{ faq
+support_chats ||--o{ support_messages
+tasks ||--o{ attachments
+tasks ||--o{ inbox
+tasks ||--o{ task_events
+users ||--o{ attachments
+users ||--o{ audit_log
+users ||--o{ calendar_feeds
+users ||--o{ discussions
+users ||--o{ event_photos
+users ||--o{ events
+users ||--o{ inbox
+users ||--o{ link_codes
+users ||--o{ messages
+users ||--o{ notifications
+users ||--o{ party_requests
+users ||--o{ questions
+users ||--o{ support_chats
+users ||--o{ support_messages
+users ||--o{ task_events
+users ||--o{ tasks
+users ||--o{ team_members
+@enduml

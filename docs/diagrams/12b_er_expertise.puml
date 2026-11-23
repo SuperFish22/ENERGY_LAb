@@ -1,0 +1,179 @@
+@startuml
+!include _style.iuml
+skinparam defaultFontSize 13
+skinparam monochrome false
+skinparam ClassBackgroundColor white
+skinparam ClassBorderColor black
+hide circle
+hide methods
+skinparam linetype ortho
+entity event_formats {
+  *id : INT <<PK>>
+  --
+  code : VARCHAR(10) <<UK>>
+  name : VARCHAR(100)
+  group_name : VARCHAR(100)
+}
+entity venues {
+  *id : INT <<PK>>
+  --
+  name : VARCHAR(150)
+  address : VARCHAR(255)
+  capacity : INT
+}
+entity events {
+  *id : INT <<PK>>
+  --
+  code : VARCHAR(20) <<UK>>
+  title : VARCHAR(200)
+  format_id : INT <<FK>>
+  venue_id : INT <<FK>>
+  author_id : INT <<FK>>
+  status : VARCHAR(20)
+  planned_date : DATE
+  start_time : VARCHAR(5)
+  slot_min : SMALLINT
+  album_url : VARCHAR(500)
+  age_rating : VARCHAR(4)
+  ticket_price : NUMERIC(10, 2)
+  planned_budget : NUMERIC(12, 2)
+  capacity : INT
+  target_audience : VARCHAR(255)
+  description : TEXT
+  timepad_event_id : VARCHAR(40)
+  timepad_url : VARCHAR(255)
+  created_at : TIMESTAMP
+}
+entity stations {
+  *id : INT <<PK>>
+  --
+  event_id : INT <<FK>>
+  order_no : SMALLINT
+  title : VARCHAR(150)
+  description : TEXT
+  duration_min : SMALLINT
+  cost : NUMERIC(10, 2)
+  responsible_id : INT <<FK>>
+  kind : VARCHAR(10)
+  parent_id : INT <<FK>>
+  rated : BOOLEAN
+  fact_min : SMALLINT
+  groups : SMALLINT
+  transition_min : SMALLINT
+}
+entity criteria {
+  *id : INT <<PK>>
+  --
+  department_id : INT <<FK>>
+  code : VARCHAR(20) <<UK>>
+  name : VARCHAR(150)
+  weight : FLOAT
+}
+entity event_experts {
+  *event_id : INT <<PK>> <<FK>>
+  *expert_id : INT <<PK>> <<FK>>
+  --
+}
+entity expertise_rounds {
+  *id : INT <<PK>>
+  --
+  event_id : INT <<FK>>
+  round_no : SMALLINT
+  deadline : DATE
+  opened_at : TIMESTAMP
+  closed_at : TIMESTAMP
+  kendall_w : FLOAT
+}
+entity evaluations {
+  *id : INT <<PK>>
+  --
+  round_id : INT <<FK>>
+  expert_id : INT <<FK>>
+  criterion_id : INT <<FK>>
+  station_id : INT <<FK>>
+  score : SMALLINT
+  comment : TEXT
+  submitted : BOOLEAN
+  updated_at : TIMESTAMP
+}
+entity risk_assessments {
+  *id : INT <<PK>>
+  --
+  round_id : INT <<FK>>
+  station_id : INT <<FK>>
+  expert_id : INT <<FK>>
+  probability : SMALLINT
+  impact : SMALLINT
+  comment : TEXT
+}
+entity attachments {
+  *id : INT <<PK>>
+  --
+  event_id : INT <<FK>>
+  task_id : INT <<FK>>
+  kind : VARCHAR(5)
+  title : VARCHAR(200)
+  category : VARCHAR(15)
+  file : VARCHAR(255)
+  original_name : VARCHAR(200)
+  size : INT
+  url : VARCHAR(500)
+  provider : VARCHAR(10)
+  uploaded_by : INT <<FK>>
+  created_at : TIMESTAMP
+}
+entity event_photos {
+  *id : INT <<PK>>
+  --
+  event_id : INT <<FK>>
+  file : VARCHAR(255)
+  caption : VARCHAR(200)
+  order_no : SMALLINT
+  is_cover : BOOLEAN
+  uploaded_by : INT <<FK>>
+  created_at : TIMESTAMP
+}
+entity departments #DDDDDD {
+  *id : INT <<PK>>
+}
+entity experts #DDDDDD {
+  *id : INT <<PK>>
+}
+entity tasks #DDDDDD {
+  *id : INT <<PK>>
+}
+entity users #DDDDDD {
+  *id : INT <<PK>>
+}
+criteria ||--o{ evaluations
+departments ||--o{ criteria
+event_formats ||--o{ events
+events ||--o{ attachments
+events ||--o{ event_experts
+events ||--o{ event_photos
+events ||--o{ expertise_rounds
+events ||--o{ stations
+expertise_rounds ||--o{ evaluations
+expertise_rounds ||--o{ risk_assessments
+experts ||--o{ evaluations
+experts ||--o{ event_experts
+experts ||--o{ risk_assessments
+stations ||--o{ evaluations
+stations ||--o{ risk_assessments
+stations ||--o{ stations
+tasks ||--o{ attachments
+users ||--o{ attachments
+users ||--o{ event_photos
+users ||--o{ events
+users ||--o{ stations
+venues ||--o{ events
+legend bottom left
+  <b>Обозначения</b>
+  | прямоугольник | таблица: над чертой первичный ключ, под чертой остальные столбцы |
+  | серый прямоугольник только с ключом | таблица из другого рисунка физической модели |
+  | <<PK>> | первичный ключ |
+  | <<FK>> | внешний ключ |
+  | <<UK>> | уникальное значение |
+  | две черты — вилка с кружком | связь «один ко многим» (ноль или много записей) |
+endlegend
+@enduml

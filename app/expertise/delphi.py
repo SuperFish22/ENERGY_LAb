@@ -46,5 +46,10 @@ def median_iqr(values: list[float]) -> tuple[float, float]:
     return med, q[2] - q[0]
 
 
-def needs_second_round(w: float | None, round_no: int, threshold: float, max_rounds: int) -> bool:
-    return w is not None and w < threshold and round_no < max_rounds
+def needs_second_round(w: float | None, round_no: int, threshold: float, max_rounds: int,
+                       max_v: float | None = None, cv_max: float = 33) -> bool:
+    """Второй тур нужен, если ранжирование не согласовано (W ниже порога) или оценки хотя бы одного блока
+    разошлись сильнее порога коэффициента вариации."""
+    if round_no >= max_rounds:
+        return False
+    return (w is not None and w < threshold) or (max_v is not None and max_v > cv_max)

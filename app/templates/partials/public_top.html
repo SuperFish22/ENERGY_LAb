@@ -1,16 +1,12 @@
 <header class="top-shell">
   <div class="wrap"><div class="top">
-    <a class="logo" href="/"><span class="planet-badge" aria-hidden="true"></span><span class="logo-copy"><b>Energy Lab</b><small>тусовки, квесты, квизы</small></span></a>
+    <a class="logo" href="/"><img class="logo-img" src="/static/img/energy-logo.png?v={{ ASSET_V }}" alt="" width="58" height="44"><span class="logo-copy"><b>Energy Lab</b><small>тусовки, квесты, квизы</small></span></a>
     <nav aria-label="Основное меню">
-      {% if active == 'home' %}
-      <a class="nav-anchor" href="#events">Мероприятия</a><a class="nav-anchor" href="#soon">Скоро</a><a class="nav-anchor" href="#price">Цена</a><a class="nav-anchor" href="#album">Альбом</a><a class="nav-anchor" href="#crew">Команда</a>
-      <a class="nav-order" href="#request">Заказать тусовку</a>
-      {% else %}
       <a href="/afisha" {% if active == 'afisha' %}aria-current="page"{% endif %}>Афиша</a>
       <a href="/archive" {% if active == 'archive' %}aria-current="page"{% endif %}>Альбом</a>
-      <a href="/board" {% if active == 'board' %}aria-current="page"{% endif %}>Вопросы</a>
-      <a class="nav-order" href="/#request">Заказать тусовку</a>
-      {% endif %}
+      <a href="/faq" {% if active in ('faq', 'board') %}aria-current="page"{% endif %}>Вопросы</a>
+      <a class="nav-order" href="/order" {% if active == 'order' %}aria-current="page"{% endif %}>Заказать мероприятие</a>
+      {% with full = False %}{% include "partials/socials.html" %}{% endwith %}
       {% if user %}<a class="nav-team" href="/cabinet">Кабинет</a>{% else %}<a class="nav-team" href="/login" title="Вход для команды Lab">Вход</a>{% endif %}
     </nav>
   </div></div>

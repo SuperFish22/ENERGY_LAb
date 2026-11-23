@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Вопросы и ответы — Energy Lab{% endblock %}
+{% block description %}Ответы на частые вопросы о мероприятиях Energy Lab: билеты, возраст, заказ тусовки под ключ.{% endblock %}
+{% block body %}
+{% set active = 'faq' %}{% include "partials/public_top.html" %}
+<main class="wrap faq-page">
+  <div class="faq-head">
+    <h1>Вопросы и ответы</h1>
+    <p class="muted">Собрали то, о чём спрашивают чаще всего. Не нашли ответ — напишите нам{% if bot_url() %} в <a href="{{ bot_url() }}" target="_blank" rel="noopener">бот ENERGY в Telegram</a>: ответит живой оператор{% else %} в бот ENERGY в Telegram или ВКонтакте: ответит живой оператор{% endif %}. Или задайте вопрос на <a href="/board">доске</a>.</p>
+  </div>
+  {% if groups %}
+  {% if groups|length > 1 %}<nav class="faq-topics" aria-label="Темы">{% for topic, items in groups %}<a href="#t{{ loop.index }}">{{ topic }}</a>{% endfor %}</nav>{% endif %}
+  {% for topic, items in groups %}
+  <section class="faq-group" id="t{{ loop.index }}" aria-labelledby="th{{ loop.index }}">
+    <h2 id="th{{ loop.index }}">{{ topic }}</h2>
+    {% for f in items %}
+    <details class="faq-item" id="q{{ f.id }}"><summary>{{ f.question }}</summary><div class="faq-answer">{{ f.answer }}</div></details>
+    {% endfor %}
+  </section>
+  {% endfor %}
+  {% else %}<p class="empty">Раздел пока заполняется. Напишите свой вопрос в бот ENERGY — оператор ответит.</p>{% endif %}
+  <aside class="faq-cta">
+    <h2>Остался вопрос?</h2>
+    <p>Напишите боту ENERGY обычным сообщением — без регистрации. Ответ придёт туда же, обычно в течение рабочего дня.</p>
+    <p class="row-actions">{% if bot_url() %}<a class="btn btn-launch" href="{{ bot_url() }}" target="_blank" rel="noopener">Написать в Telegram</a>{% endif %}{% for s in social_links() if s.key == 'vk' %}<a class="btn" href="{{ s.url }}" target="_blank" rel="noopener">Написать во ВКонтакте</a>{% endfor %}<a class="btn" href="/order">Заказать мероприятие</a></p>
+  </aside>
+</main>
+<script>(function(){var h=location.hash;if(/^#q\d+$/.test(h)){var d=document.querySelector(h);if(d)d.open=true;}})();</script>
+{% include "partials/public_foot.html" %}
+{% endblock %}

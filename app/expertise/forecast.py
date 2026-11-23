@@ -48,7 +48,7 @@ def distance(a: EventFeatures, b: EventFeatures, pool: list[EventFeatures], weig
         "price": (a.price - b.price) / p_rng,
         "capacity": (a.capacity - b.capacity) / c_rng,
         "season": _season(a.month, b.month),
-        "score": ((a.score or 0) - (b.score or 0)) / 4 if a.score is not None and b.score is not None else 0.0,
+        "score": ((a.score or 0) - (b.score or 0)) / 9 if a.score is not None and b.score is not None else 0.0,
     }
     return math.sqrt(sum(weights.get(k, 0) * v ** 2 for k, v in terms.items()))
 
@@ -104,19 +104,27 @@ def predict(target: EventFeatures, history: list[EventFeatures], weights: dict, 
 
 
 def recommend(S: float | None, has_red: bool, w: float | None, rounds_done: int, max_rounds: int,
-              budget: float | None, revenue: float | None) -> tuple[str, list[str]]:
-    """Правила рекомендации, проверяются по порядку."""
+              budget: float | None, revenue: float | None, stations_v: list[tuple[str, float]] | None = None,
+              reject_below: float = 5.5, rework_below: float = 6.5, cv_max: float = 33) -> tuple[str, list[str]]:
+    """Правила рекомендации, проверяются по порядку (шкала 1–10).
+
+    stations_v — пары (название блока, коэффициент вариации V, %) по оцениваемым блокам сценария.
+    """
     reasons: list[str] = []
     if S is None:
         return "Недостаточно оценок", ["Ни один отдел ещё не выставил баллы"]
-    if S < 3.0:
-        return "Отклонить или переработать концепцию", [f"Итоговая оценка {S:.2f} ниже 3,0"]
+    if S < reject_below:
+        why = f"Итоговая оценка {S:.2f} ниже {reject_below:g}".replace(".", ",")
+        return "Отклонить или переработать концепцию", [why]
     if has_red:
-        reasons.append("Есть станция в красной зоне риска")
+        reasons.append("Есть блок сценария в красной зоне риска")
     if w is not None and w < 0.5 and rounds_done >= max_rounds:
-        reasons.append(f"Эксперты не согласовали оценки: W = {w:.2f} после {rounds_done} туров")
-    if S < 3.5:
-        reasons.append(f"Итоговая оценка {S:.2f} ниже 3,5")
+        reasons.append(f"Эксперты не согласовали ранжирование блоков: W = {w:.2f} после {rounds_done} туров")
+    for title, v in stations_v or []:
+        if v is not None and v > cv_max and rounds_done >= max_rounds:
+            reasons.append(f"Оценки блока «{title}» не согласованы: V = {v:.0f} % (порог {cv_max:g} %)")
+    if S < rework_below:
+        reasons.append(f"Итоговая оценка {S:.2f} ниже {rework_below:g}".replace(".", ","))
     warn = []
     if budget is not None and revenue is not None and budget > revenue:
         warn.append("Прогноз затрат выше прогноза выручки: мероприятие не окупается")

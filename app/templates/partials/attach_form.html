@@ -1,0 +1,23 @@
+{#- Форма «файл или ссылка на диск». Нужны: action, uid (уникальный префикс id), with_category, file_accept. -#}
+<form method="post" action="{{ action }}" enctype="multipart/form-data" class="attach-form" data-attach>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <fieldset class="attach-mode"><legend class="sr">Что добавить</legend>
+    <label><input type="radio" name="mode" value="file" checked> Файл с компьютера</label>
+    <label><input type="radio" name="mode" value="link"> Ссылка на Яндекс Диск или Google Диск</label>
+  </fieldset>
+  <div class="attach-fields">
+    <div class="field" data-mode="file"><label for="{{ uid }}-f">Файл</label><input id="{{ uid }}-f" type="file" name="file" accept="{{ file_accept }}">
+      <span class="small muted">PDF, Word, Excel, PowerPoint, ZIP, картинки — до 20 МБ</span></div>
+    <div class="field" data-mode="link" hidden><label for="{{ uid }}-u">Ссылка</label><input id="{{ uid }}-u" name="url" inputmode="url" placeholder="https://disk.yandex.ru/d/… или https://drive.google.com/…">
+      <span class="small muted">Проверьте, что в настройках диска открыт доступ по ссылке</span></div>
+    <div class="field"><label for="{{ uid }}-t">Название <span class="muted">(необязательно)</span></label><input id="{{ uid }}-t" name="title" maxlength="200" placeholder="Например: Смета v2"></div>
+    {% if with_category %}<div class="field"><label for="{{ uid }}-c">Тип</label><select id="{{ uid }}-c" name="category">{% for k, v in doc_categories.items() %}<option value="{{ k }}" {% if k == 'other' %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></div>{% endif %}
+  </div>
+  <button class="btn btn-launch">Добавить</button>
+</form>
+<script>
+(() => { document.querySelectorAll('[data-attach]').forEach((f) => { if (f.dataset.ready) return; f.dataset.ready = 1;
+  const sync = () => { const mode = f.querySelector('input[name=mode]:checked').value;
+    f.querySelectorAll('[data-mode]').forEach((el) => { el.hidden = el.dataset.mode !== mode; }); };
+  f.addEventListener('change', (e) => { if (e.target.name === 'mode') sync(); }); sync(); }); })();
+</script>

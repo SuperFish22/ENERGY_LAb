@@ -27,7 +27,7 @@ def summary(db: Session, event: m.Event, rnd: m.ExpertiseRound | None = None) ->
     rnd = rnd or latest_round(db, event.id)
     criteria, dept_w, depts = _criteria_maps(db)
     out = {"round": rnd, "S": None, "departments": {}, "stations": [], "W": None, "W_by_dept": {},
-           "Q": None, "has_red": False, "missing_departments": [], "progress": []}
+           "Q": None, "has_red": False, "missing_departments": [], "progress": [], "V": None, "max_V": None}
     if not rnd:
         return out
     evals = db.scalars(select(m.Evaluation).where(m.Evaluation.round_id == rnd.id,
@@ -41,8 +41,22 @@ def summary(db: Session, event: m.Event, rnd: m.ExpertiseRound | None = None) ->
     # станции: баллы + риски
     risks = db.scalars(select(m.RiskAssessment).where(m.RiskAssessment.round_id == rnd.id)).all()
     levels = []
-    for st in event.stations:
+    expert_ids_all = sorted({e.expert_id for e in evals})
+
+    def spread(station_id):
+        """Коэффициент вариации итоговых оценок экспертов по объекту (проект или блок сценария)."""
+        vals, cs = [], []
+        for eid in expert_ids_all:
+            v = scoring.expert_total(scores, criteria, dept_w, eid, station_id)
+            if v is not None:
+                vals.append(v)
+                cs.append(comp.get(eid, 0.7))
+        return scoring.variation(vals, cs)
+    proj_var = spread(None)
+    out["V"] = proj_var["V"] if proj_var else None
+    for st in event.rated_stations:
         st_scores = scoring.object_score(scores, criteria, dept_w, comp, st.id)["S"]
+        st_var = spread(st.id)
         rs = [r for r in risks if r.station_id == st.id]
         if rs:
             cw = [comp.get(r.expert_id, 0.7) for r in rs]
@@ -54,13 +68,19 @@ def summary(db: Session, event: m.Event, rnd: m.ExpertiseRound | None = None) ->
         else:
             p = i = lvl = None
             zn = None
+        v = st_var["V"] if st_var else None
+        agr = scoring.agreement(v, METHOD["cv_zones"])
         out["stations"].append({"station": st, "S": st_scores, "P": p, "I": i, "R": lvl, "zone": zn,
-                                "zone_name": risk.ZONE_NAMES.get(zn, "—")})
+                                "zone_name": risk.ZONE_NAMES.get(zn, "—"), "V": v,
+                                "sigma": st_var["sigma"] if st_var else None, "n": st_var["n"] if st_var else 0,
+                                "agreement": agr, "agreement_name": scoring.AGREEMENT_NAMES.get(agr, "—")})
     out["has_red"] = any(s["zone"] == "red" for s in out["stations"])
+    vs = [s["V"] for s in out["stations"] if s["V"] is not None]
+    out["max_V"] = max(vs) if vs else None
     out["Q"] = risk.event_risk(levels, METHOD["kappa"]) if levels else None
     # согласованность: ранги станций по итоговому баллу каждого эксперта
     expert_ids = sorted({e.expert_id for e in evals})
-    station_ids = [s.id for s in event.stations]
+    station_ids = [s.id for s in event.rated_stations]
 
     def matrix_for(dept_id=None):
         rows = []
@@ -121,10 +141,12 @@ def build_forecast(db: Session, event: m.Event) -> m.Forecast:
                             [float(s.cost or 0) for s in event.stations])
     rounds_done = summ["round"].round_no if summ["round"] else 0
     rec, reasons = forecast.recommend(summ["S"], summ["has_red"], summ["W"], rounds_done, METHOD["max_rounds"],
-                                      pred.get("budget"), pred.get("revenue"))
+                                      pred.get("budget"), pred.get("revenue"),
+                                      [(s["station"].title, s["V"]) for s in summ["stations"]],
+                                      METHOD["reject_below"], METHOD["rework_below"], METHOD["cv_zones"][1])
     if not pred.get("analogs"):
         reasons = reasons + ["Нет проведённых мероприятий-аналогов: количественный прогноз не строится"]
-    fc = m.Forecast(event_id=event.id, expert_score=summ["S"], kendall_w=summ["W"],
+    fc = m.Forecast(event_id=event.id, expert_score=summ["S"], kendall_w=summ["W"], variation=summ["V"],
                     attendance=pred.get("attendance"), attendance_low=pred.get("attendance_low"),
                     attendance_high=pred.get("attendance_high"), tickets_sold=pred.get("tickets_sold"),
                     revenue=pred.get("revenue"), budget=pred.get("budget"), avg_rating=pred.get("avg_rating"),
@@ -153,7 +175,7 @@ def update_competence(db: Session, event: m.Event) -> list[tuple[str, float, flo
             continue
         ex = db.get(m.Expert, eid)
         new = competence.update(ex.competence, s_e, event.result.avg_rating, METHOD["eta"],
-                                METHOD["competence_bounds"])
+                                METHOD["competence_bounds"], METHOD["scale_max"])
         db.add(m.CompetenceHistory(expert_id=eid, event_id=event.id, old_value=ex.competence, new_value=new,
                                    reason=f"Факт мероприятия {event.code}"))
         changes.append((ex.user.full_name, ex.competence, new))

@@ -20,7 +20,7 @@ jobs:
         with: {python-version: "3.12", cache: pip}
       - run: pip install -r requirements-dev.txt
       - name: Линтер
-        run: ruff check app tests
+        run: ruff check app tests bot
       - name: Тесты (SQLite) и покрытие расчётного модуля не ниже 90 %
         run: pytest -q --cov=app/expertise --cov-fail-under=90
       - name: Миграции на PostgreSQL

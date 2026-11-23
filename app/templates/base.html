@@ -5,11 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Energy Lab{% endblock %}</title>
   <meta name="description" content="{% block description %}Energy Lab — творческая лаборатория педагогического отряда ENERGY: квизы, квесты, ролевые игры и вечеринки.{% endblock %}">
-  <link rel="icon" href="/static/img/logo.svg" type="image/svg+xml">
+  <link rel="icon" href="/static/img/favicon.png?v={{ ASSET_V }}" type="image/png">
+  <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png?v={{ ASSET_V }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=Unbounded:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/lab.css">
+  <link rel="stylesheet" href="/static/css/lab.css?v={{ ASSET_V }}">
   {% block head %}{% endblock %}
 </head>
 <body>

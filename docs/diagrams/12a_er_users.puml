@@ -1,0 +1,111 @@
+@startuml
+!include _style.iuml
+skinparam defaultFontSize 13
+skinparam monochrome false
+skinparam ClassBackgroundColor white
+skinparam ClassBorderColor black
+hide circle
+hide methods
+skinparam linetype ortho
+entity roles {
+  *id : INT <<PK>>
+  --
+  code : VARCHAR(20) <<UK>>
+  name : VARCHAR(100)
+}
+entity user_roles {
+  *user_id : INT <<PK>> <<FK>>
+  *role_id : INT <<PK>> <<FK>>
+  --
+}
+entity users {
+  *id : INT <<PK>>
+  --
+  full_name : VARCHAR(150)
+  email : VARCHAR(120) <<UK>>
+  phone : VARCHAR(20)
+  password_hash : VARCHAR(255)
+  telegram_id : VARCHAR(40) <<UK>>
+  vk_id : VARCHAR(40) <<UK>>
+  notify_channel : VARCHAR(10)
+  is_active : BOOLEAN
+  created_at : TIMESTAMP
+}
+entity departments {
+  *id : INT <<PK>>
+  --
+  code : VARCHAR(20) <<UK>>
+  name : VARCHAR(100)
+  weight : FLOAT
+}
+entity experts {
+  *id : INT <<PK>>
+  --
+  user_id : INT <<FK>>
+  department_id : INT <<FK>>
+  competence : FLOAT
+  is_external : BOOLEAN
+  organization : VARCHAR(150)
+}
+entity competence_history {
+  *id : INT <<PK>>
+  --
+  expert_id : INT <<FK>>
+  event_id : INT <<FK>>
+  old_value : FLOAT
+  new_value : FLOAT
+  reason : VARCHAR(200)
+  created_at : TIMESTAMP
+}
+entity team_members {
+  *id : INT <<PK>>
+  --
+  full_name : VARCHAR(150)
+  role : VARCHAR(120)
+  department_id : INT <<FK>>
+  bio : VARCHAR(400)
+  photo : VARCHAR(255)
+  order_no : SMALLINT
+  is_public : BOOLEAN
+  consent : BOOLEAN
+  user_id : INT <<FK>>
+}
+entity link_codes {
+  *id : INT <<PK>>
+  --
+  user_id : INT <<FK>>
+  code : VARCHAR(12) <<UK>>
+  expires_at : TIMESTAMP
+}
+entity calendar_feeds {
+  *id : INT <<PK>>
+  --
+  user_id : INT <<FK>>
+  token : VARCHAR(64) <<UK>>
+  enabled : BOOLEAN
+  consent_at : TIMESTAMP
+  created_at : TIMESTAMP
+}
+entity events #DDDDDD {
+  *id : INT <<PK>>
+}
+departments ||--o{ experts
+departments ||--o{ team_members
+events ||--o{ competence_history
+experts ||--o{ competence_history
+roles ||--o{ user_roles
+users ||--o{ calendar_feeds
+users ||--o{ experts
+users ||--o{ link_codes
+users ||--o{ team_members
+users ||--o{ user_roles
+legend bottom left
+  <b>Обозначения</b>
+  | прямоугольник | таблица: над чертой первичный ключ, под чертой остальные столбцы |
+  | серый прямоугольник только с ключом | таблица из другого рисунка физической модели |
+  | <<PK>> | первичный ключ |
+  | <<FK>> | внешний ключ |
+  | <<UK>> | уникальное значение |
+  | две черты — вилка с кружком | связь «один ко многим» (ноль или много записей) |
+endlegend
+@enduml

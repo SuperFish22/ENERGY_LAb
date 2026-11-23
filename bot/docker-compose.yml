@@ -1,0 +1,13 @@
+# Бот на внешнем сервере (там же, где был n8n). Наружу ничего не публикует: сам ходит в Telegram и на сайт.
+# Запуск: cd ~/energy-bot/bot && cp .env.example .env && nano .env && docker compose up -d --build
+name: energybot
+services:
+  bot:
+    build:
+      context: ..
+      dockerfile: bot/Dockerfile
+    env_file: .env
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}

@@ -4,7 +4,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app import media, site
+from app import media, site, support
 from app import models as m
 from app.config import settings
 from app.db import get_db
@@ -102,19 +102,37 @@ def venue_add(request: Request, name: str = Form(...), address: str = Form(""), 
     return RedirectResponse("/cabinet/admin/criteria", 303)
 
 
+QUESTION_STATUSES = ("pending", "approved", "answered", "rejected")
+MODERATORS = ("head", "support")
+
+
 @router.get("/questions")
-def questions(request: Request, db: Session = Depends(get_db), user: m.User = Depends(require("head"))):
-    qs = db.scalars(select(m.Question).order_by(m.Question.status != "sos", m.Question.status != "pending",
-                                                m.Question.id.desc()).limit(200)).all()
-    return render(request, "cabinet/admin_questions.html", {"user": user, "questions": qs})
+def questions(request: Request, status: str = "", db: Session = Depends(get_db),
+              user: m.User = Depends(require(*MODERATORS))):
+    stmt = select(m.Question).order_by(m.Question.status != "pending", m.Question.id.desc())
+    if status in QUESTION_STATUSES:
+        stmt = stmt.where(m.Question.status == status)
+    items = db.scalars(stmt.limit(200)).all()
+    in_faq = set(db.scalars(select(m.FaqItem.question_id).where(m.FaqItem.question_id.is_not(None))))
+    return render(request, "cabinet/admin_questions.html", {"user": user, "questions": items, "status": status,
+                                                            "in_faq": in_faq, "nav": "faq"})
 
 
 @router.post("/questions/{qid}", dependencies=[Depends(csrf)])
 def question_moderate(qid: int, request: Request, action: str = Form(...), answer: str = Form(""),
-                      db: Session = Depends(get_db), user: m.User = Depends(require("head"))):
+                      db: Session = Depends(get_db), user: m.User = Depends(require(*MODERATORS))):
     q = db.get(m.Question, qid)
     if not q:
         raise HTTPException(404)
+    if action == "faq":
+        if not (q.answer or "").strip():
+            flash(request, "Сначала ответьте на вопрос — в FAQ переносится пара «вопрос — ответ»", "error")
+            return RedirectResponse("/cabinet/admin/questions", 303)
+        item = support.faq_from_question(db, q)
+        audit(db, user.id, "faq_from_question", "faq", str(q.id))
+        db.commit()
+        flash(request, "Вопрос добавлен в FAQ черновиком: проверьте формулировку и опубликуйте")
+        return RedirectResponse(f"/cabinet/admin/faq#f{item.id}", 303)
     if action == "approve":
         q.status = "approved"
     elif action == "answer" and answer.strip():
@@ -130,6 +148,70 @@ def question_moderate(qid: int, request: Request, action: str = Form(...), answe
     return RedirectResponse("/cabinet/admin/questions", 303)
 
 
+# ------------------------------------------------------------------ вопросы и ответы (FAQ, spec 005)
+@router.get("/faq")
+def faq(request: Request, db: Session = Depends(get_db), user: m.User = Depends(require(*MODERATORS))):
+    items = support.faq_items(db, published_only=False)
+    topics = sorted({i.topic for i in items} | {"Общие вопросы", "Билеты и оплата", "Заказ мероприятия",
+                                                "На мероприятии"})
+    return render(request, "cabinet/admin_faq.html", {"user": user, "items": items, "topics": topics, "nav": "faq"})
+
+
+def _faq_fields(item: m.FaqItem, form) -> str | None:
+    q, a = (form.get("question") or "").strip(), (form.get("answer") or "").strip()
+    if len(q) < 3 or not a:
+        return "Заполните вопрос и ответ"
+    item.question, item.answer = q[:300], a[:4000]
+    item.topic = (form.get("topic") or "").strip()[:40] or "Общие вопросы"
+    item.is_published = form.get("is_published") == "1"
+    return None
+
+
+@router.post("/faq", dependencies=[Depends(csrf)])
+async def faq_add(request: Request, db: Session = Depends(get_db), user: m.User = Depends(require(*MODERATORS))):
+    form = await request.form()
+    item = m.FaqItem(order_no=(db.scalar(select(func.max(m.FaqItem.order_no))) or 0) + 1)
+    err = _faq_fields(item, form)
+    if err:
+        flash(request, err, "error")
+        return RedirectResponse("/cabinet/admin/faq#new", 303)
+    db.add(item)
+    audit(db, user.id, "faq_add", "faq", item.question[:60])
+    db.commit()
+    flash(request, "Вопрос добавлен" + (" и опубликован" if item.is_published else " черновиком"))
+    return RedirectResponse(f"/cabinet/admin/faq#f{item.id}", 303)
+
+
+@router.post("/faq/{fid}", dependencies=[Depends(csrf)])
+async def faq_update(fid: int, request: Request, db: Session = Depends(get_db),
+                     user: m.User = Depends(require(*MODERATORS))):
+    item = db.get(m.FaqItem, fid)
+    if not item:
+        raise HTTPException(404)
+    form = await request.form()
+    action = form.get("action") or "save"
+    if action in ("up", "down"):
+        items = support.faq_items(db, published_only=False)
+        i = items.index(item)
+        j = i - 1 if action == "up" else i + 1
+        if 0 <= j < len(items):
+            items[i], items[j] = items[j], items[i]
+        for k, it in enumerate(items):
+            it.order_no = k
+    elif action == "delete":
+        db.delete(item)
+    else:
+        err = _faq_fields(item, form)
+        if err:
+            flash(request, err, "error")
+            return RedirectResponse(f"/cabinet/admin/faq#f{fid}", 303)
+    audit(db, user.id, f"faq_{action}", "faq", str(fid))
+    db.commit()
+    if action == "save":
+        flash(request, "Сохранено")
+    return RedirectResponse("/cabinet/admin/faq" + ("" if action == "delete" else f"#f{fid}"), 303)
+
+
 # ------------------------------------------------------------------ настройки главной страницы
 @router.get("/site")
 def site_settings(request: Request, db: Session = Depends(get_db), user: m.User = Depends(require("head"))):
@@ -137,7 +219,8 @@ def site_settings(request: Request, db: Session = Depends(get_db), user: m.User 
     return render(request, "cabinet/admin_site.html", {
         "user": user, "team": team, "departments": db.scalars(select(m.Department)).all(),
         "users": db.scalars(select(m.User).where(m.User.is_active.is_(True)).order_by(m.User.full_name)).all(),
-        "texts": site.texts(db), "labels": site.TEXT_LABELS, "pricing": site.pricing(db), "nav": "site"})
+        "texts": site.texts(db), "labels": site.TEXT_LABELS, "pricing": site.pricing(db), "nav": "site",
+        "socials": site.socials(db), "networks": site.NETWORKS})
 
 
 def _member_fields(member: m.TeamMember, form) -> None:
@@ -215,6 +298,19 @@ async def texts_save(request: Request, db: Session = Depends(get_db), user: m.Us
     db.commit()
     flash(request, "Тексты главной сохранены")
     return RedirectResponse("/cabinet/admin/site#texts", 303)
+
+
+@router.post("/site/socials", dependencies=[Depends(csrf)])
+async def socials_save(request: Request, db: Session = Depends(get_db), user: m.User = Depends(require("head"))):
+    form = await request.form()
+    errors = site.save_socials(db, {k: form.get(k) or "" for k in site.NETWORKS})
+    audit(db, user.id, "site_socials", "site")
+    db.commit()
+    if errors:
+        flash(request, "Не сохранены: " + "; ".join(errors), "error")
+    else:
+        flash(request, "Ссылки на соцсети сохранены — они уже в шапке и подвале сайта")
+    return RedirectResponse("/cabinet/admin/site#socials", 303)
 
 
 def _num(v, default, lo, hi):

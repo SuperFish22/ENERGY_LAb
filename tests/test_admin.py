@@ -18,6 +18,8 @@ def test_median_iqr_and_second_round_rule():
     assert delphi.needs_second_round(0.3, 1, 0.5, 2) is True
     assert delphi.needs_second_round(0.3, 2, 0.5, 2) is False     # не больше двух туров
     assert delphi.needs_second_round(None, 1, 0.5, 2) is False
+    assert delphi.needs_second_round(0.8, 1, 0.5, 2, max_v=40) is True       # оценки блока разошлись
+    assert delphi.needs_second_round(0.8, 1, 0.5, 2, max_v=15) is False
 
 
 def test_invite_and_register(client, db):
@@ -93,18 +95,18 @@ def test_second_round_shows_medians(client, db):
     head.form(f"{page}/rounds", {}, page)
     c = Client(app).__enter__().login("script@energy.local")
     crit = script.department.criteria[0].id
-    c.form(f"{page}/evaluate", {f"score_{crit}": "5", "action": "submit", "station_id": ""}, f"{page}/evaluate")
+    c.form(f"{page}/evaluate", {f"score_{crit}": "9", "action": "submit", "station_id": ""}, f"{page}/evaluate")
     head.form(f"{page}/rounds/close", {}, page)
     assert head.form(f"{page}/rounds", {}, page).status_code == 303          # второй тур
     txt = c.get(f"{page}/evaluate").text
     assert "медиана тура 1" in txt
     # большой сдвиг балла без причины не принимается
-    c.form(f"{page}/evaluate", {f"score_{crit}": "2", "comment_" + str(crit): "", "action": "submit",
+    c.form(f"{page}/evaluate", {f"score_{crit}": "5", "comment_" + str(crit): "", "action": "submit",
                                 "station_id": ""}, f"{page}/evaluate")
     db.expire_all()
     rnd2 = db.scalar(select(m.ExpertiseRound).where(m.ExpertiseRound.event_id == ev.id, m.ExpertiseRound.round_no == 2))
     e = db.scalar(select(m.Evaluation).where(m.Evaluation.round_id == rnd2.id, m.Evaluation.criterion_id == crit))
-    assert e.score == 5
+    assert e.score == 9
     head.form(f"{page}/rounds/close", {}, page)
     assert head.form(f"{page}/rounds", {}, page).status_code == 303
     db.expire_all()
@@ -127,7 +129,10 @@ def test_export_placeholders(client, db):
     rows = client.get("/api/bot/export/registry", headers=BOT).json()["rows"]
     assert any(r["CODE"] == "LAB-2026-01" and r["GUESTS_FACT"] == 45 for r in rows)
     one = client.get("/api/bot/export/events/LAB-2026-07", headers=BOT).json()
-    assert one["placeholders"]["CODE"] == "LAB-2026-07" and len(one["stations"]) == 3
+    assert one["placeholders"]["CODE"] == "LAB-2026-07" and one["placeholders"]["SCENARIO_MINUTES"] == 121
+    scn = one["scenario"]                          # 4 блока + 3 станции карусели
+    assert len(scn) == 7 and scn[0]["start"] == "19:00" and scn[-1]["end"] == "21:01"
+    assert [r["no"] for r in scn if r["kind"] == "Станция"] == ["3.1", "3.2", "3.3"]
     assert "@" not in str(one)                                                 # нет e-mail в выгрузке
     assert client.get("/api/bot/export/events/NOPE", headers=BOT).status_code == 404
 
@@ -170,3 +175,19 @@ def test_timepad_cp1251(client, db):
     db.expire_all()
     t = {x.external_order_id: x.status for x in db.scalars(select(m.Ticket).where(m.Ticket.event_id == ev.id))}
     assert t[f"{ev.id}:9001"] == "paid" and t[f"{ev.id}:9002"] == "refunded"
+
+
+def test_side_menu_submenus_and_filters(client, db):
+    head = Client(app).__enter__().login(*HEAD)
+    page = head.get("/cabinet/projects?status=held,analyzed").text
+    assert '<details class="nav-item" open>' in page                         # группа «Проекты» раскрыта
+    assert 'href="/cabinet/projects?status=held,analyzed" aria-current="page"' in page
+    assert "Заявки на мероприятия" in page and "Вопросы и ответы" in page and "SOS" not in page
+    assert 'href="/cabinet/evaluation/how"' in page and 'href="/cabinet/support"' in page
+    shown = db.scalars(select(m.Event).where(m.Event.status.in_(("held", "analyzed")))).all()
+    for ev in shown:
+        assert ev.code in page
+    for ev in db.scalars(select(m.Event).where(m.Event.status == "draft")).all():
+        assert ev.code not in page
+    assert head.get("/cabinet/admin/questions?status=pending").status_code == 200
+    assert head.get("/cabinet/projects?mine=1").status_code == 200

@@ -1,0 +1,15 @@
+# Что не строить в граф знаний (синтаксис как у .gitignore; сам .gitignore graphify тоже учитывает)
+venv/
+.venv/
+media/
+backups/
+*.db
+energy_lab.db
+graphify-out/
+strix_runs/
+# сгенерированное: сценарии n8n собираются из n8n/generate.py, комиксы — из docs/faq/make_comics.py
+n8n/workflows/*.json
+docs/faq/img/
+app/static/img/
+# сторонние стили и миграции-снимки не несут смысла для карты
+alembic.ini

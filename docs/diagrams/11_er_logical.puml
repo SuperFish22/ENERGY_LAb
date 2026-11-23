@@ -1,0 +1,210 @@
+@startuml
+!include _style.iuml
+hide circle
+hide methods
+skinparam linetype ortho
+entity "Роль" as roles {
+*Код роли
+--
+Наименование
+}
+entity "Пользователь" as users {
+*Код пользователя
+--
+ФИО
+E-mail
+Телефон
+мессенджер ID
+}
+entity "Отдел" as departments {
+*Код отдела
+--
+Наименование
+}
+entity "Эксперт" as experts {
+*Код эксперта
+--
+Коэффициент компетентности
+Внешний (да/нет)
+Организация
+}
+entity "Формат мероприятия" as formats {
+*Код формата
+--
+Наименование
+}
+entity "Площадка" as venues {
+*Код площадки
+--
+Название
+Адрес
+Вместимость
+}
+entity "Мероприятие" as events {
+*Код мероприятия
+--
+Название
+Статус
+Плановая дата
+Цена билета
+Плановый бюджет
+}
+entity "Блок сценария" as stations {
+*Код блока
+--
+Порядковый номер
+Вид (блок / карусель / станция)
+Название
+Длительность
+Стоимость
+Оценивается (да/нет)
+}
+entity "Критерий" as criteria {
+*Код критерия
+--
+Наименование
+Вес
+Шкала
+}
+entity "Тур экспертизы" as rounds {
+*Код тура
+--
+Номер тура
+Метод
+Коэффициент W
+}
+entity "Оценка" as evaluations {
+*Код оценки
+--
+Балл
+Комментарий
+}
+entity "Оценка риска" as risks {
+*Код оценки риска
+--
+Вероятность
+Последствия
+}
+entity "Прогноз" as forecasts {
+*Код прогноза
+--
+Явка
+Продажи
+Бюджет
+Рейтинг
+Риск провала
+}
+entity "Результат" as results {
+*Код результата
+--
+Число гостей
+Выручка
+Факт. затраты
+Средняя оценка
+}
+entity "Билет" as tickets {
+*Код билета
+--
+Покупатель
+Цена
+Статус
+}
+entity "Отзыв" as feedback {
+*Код отзыва
+--
+Оценка
+Комментарий
+}
+entity "Задача" as tasks {
+*Код задачи
+--
+Название
+Статус
+Приоритет
+Срок
+}
+entity "Документ" as attachments {
+*Код документа
+--
+Название
+Категория
+Файл или ссылка
+}
+entity "Уведомление" as inbox {
+*Код уведомления
+--
+Вид
+Текст
+Ссылка
+Прочитано (да/нет)
+}
+entity "Заявка покупателя" as requests {
+*Код заявки
+--
+Имя, контакт
+Повод
+Число гостей
+Бюджет
+Статус
+}
+entity "Вопрос FAQ" as faq {
+*Код вопроса
+--
+Вопрос
+Ответ
+Тема
+}
+entity "Диалог поддержки" as chats {
+*Код диалога
+--
+Канал
+Собеседник
+Статус
+}
+entity "Сообщение" as messages {
+*Код сообщения
+--
+Направление
+Текст
+Время
+}
+roles }|--o{ users : роли пользователя
+users ||--o| experts
+departments ||--o{ experts
+departments ||--o{ criteria
+formats ||--o{ events
+venues ||--o{ events
+users ||--o{ events : автор
+events ||--|{ stations
+stations |o--o{ stations : входит в карусель
+events ||--o{ rounds
+rounds ||--o{ evaluations
+experts ||--o{ evaluations
+criteria ||--o{ evaluations
+stations ||--o{ risks
+experts ||--o{ risks
+events ||--o{ forecasts
+events ||--o| results
+events ||--o{ tickets
+events ||--o{ feedback
+events ||--o{ tasks
+users ||--o{ tasks : исполнитель
+departments ||--o{ tasks
+events ||--o{ attachments
+tasks ||--o{ attachments
+users ||--o{ inbox
+formats ||--o{ requests
+users ||--o{ requests : менеджер
+users ||--o{ chats : оператор
+chats ||--|{ messages
+
+legend bottom left
+  <b>Обозначения</b>
+  | прямоугольник | сущность (под чертой — атрибуты, «●» — ключевой атрибут) |
+  | две черты на конце линии | ровно один экземпляр |
+  | черта и кружок | ноль или один экземпляр |
+  | вилка с чертой | один или много экземпляров |
+  | вилка с кружком | ноль или много экземпляров |
+  | подпись связи | смысл связи |
+endlegend
+@enduml

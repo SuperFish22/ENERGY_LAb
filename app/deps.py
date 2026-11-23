@@ -1,10 +1,12 @@
 """Зависимости FastAPI: текущий пользователь, проверка ролей, CSRF, шаблоны."""
+import time
 from datetime import date
 
 from fastapi import Depends, Form, HTTPException, Request
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
+from app import attachments, scenario, site
 from app import models as m
 from app.config import settings
 from app.db import get_db
@@ -42,7 +44,14 @@ def _days_left(v) -> int | None:
 
 
 templates.env.filters.update(money=_money, num=_num, ru_date=_date, date_long=_date_long, days_left=_days_left)
-templates.env.globals.update(app_name=settings.app_name, ROLE_NAMES=m.ROLE_NAMES)
+# Версия статики в ссылках (?v=…): после обновления браузер не возьмёт старый CSS/JS из кэша
+ASSET_V = str(int(time.time()))
+templates.env.globals.update(app_name=settings.app_name, ROLE_NAMES=m.ROLE_NAMES,
+                             REQUEST_STATUSES=m.REQUEST_STATUSES, ASSET_V=ASSET_V,
+                             scenario_clock=scenario.clock, BLOCK_KINDS=scenario.KINDS,
+                             social_links=site.social_links, bot_url=site.bot_url,
+                             META_NOTE=site.META_NOTE)
+templates.env.filters["filesize"] = attachments.human_size
 
 
 class LoginRequired(Exception):
@@ -83,6 +92,16 @@ def render(request: Request, name: str, ctx: dict | None = None, status_code: in
     ctx = dict(ctx or {})
     ctx.setdefault("request", request)
     ctx["csrf_token"] = csrf_token(request.session)
+    user = ctx.get("user")
+    if user is not None and "unread" not in ctx:                 # колокольчик в кабинете
+        from sqlalchemy.orm import object_session
+
+        from app.notify import unread_count
+        sess = object_session(user)
+        ctx["unread"] = unread_count(sess, user) if sess else 0
+        if sess and user.has_role("head", "support") and "support_open" not in ctx:   # счётчик в меню
+            from app.support import open_count
+            ctx["support_open"] = open_count(sess)
     ctx.setdefault("flash", request.session.pop("flash", None))
     return templates.TemplateResponse(request, name, ctx, status_code=status_code)
 

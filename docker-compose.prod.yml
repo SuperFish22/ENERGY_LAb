@@ -9,7 +9,8 @@ services:
     expose: ["8000"]
     environment:
       MEDIA_DIR: /app/media
-    volumes: ["media:/app/media"]
+      FILES_DIR: /app/files          # документы и вложения — закрытый том, не раздаётся по /media
+    volumes: ["media:/app/media", "files:/app/files"]
   db:
     image: postgres:16-alpine
     env_file: .env
@@ -31,3 +32,4 @@ services:
 volumes:
   pgdata:
   media:
+  files:

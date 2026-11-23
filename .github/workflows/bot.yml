@@ -1,0 +1,61 @@
+# Бот Energy Lab (Telegram, VK, доставка уведомлений) — Python-сервис bot/ на внешнем сервере (там же, где n8n).
+# Срабатывает, когда в main меняется папка bot/. Код сайта и данные на этот сервер не попадают — только bot/.
+# Секреты — те же, что для n8n (окружение "n8n"): N8N_SSH_HOST, N8N_SSH_USER, N8N_SSH_KEY, N8N_SSH_PORT.
+# На сервере один раз: ~/energy-bot/bot/.env (см. bot/.env.example) — его выкладка не трогает.
+name: bot
+on:
+  push:
+    branches: [main]
+    paths: ["bot/**", "tests/test_bot.py", ".github/workflows/bot.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: {python-version: "3.12"}
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Стиль
+        run: ruff check bot tests/test_bot.py
+      - name: Бот насквозь через API сайта
+        run: pytest -q tests/test_bot.py
+
+  deploy:
+    needs: check
+    runs-on: ubuntu-latest
+    environment: n8n
+    steps:
+      - uses: actions/checkout@v5
+      - name: Код бота
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.N8N_SSH_HOST }}
+          username: ${{ secrets.N8N_SSH_USER }}
+          key: ${{ secrets.N8N_SSH_KEY }}
+          port: ${{ secrets.N8N_SSH_PORT || 22 }}
+          source: "bot/*.py,bot/Dockerfile,bot/Dockerfile.dockerignore,bot/docker-compose.yml,bot/.env.example"
+          target: "energy-bot"
+      - name: Сборка и перезапуск
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.N8N_SSH_HOST }}
+          username: ${{ secrets.N8N_SSH_USER }}
+          key: ${{ secrets.N8N_SSH_KEY }}
+          port: ${{ secrets.N8N_SSH_PORT || 22 }}
+          script: |
+            set -e
+            cd ~/energy-bot/bot
+            if [ ! -f .env ]; then
+              echo "::error::Нет ~/energy-bot/bot/.env — создайте его по .env.example и запустите выкладку снова"
+              exit 1
+            fi
+            docker compose up -d --build
+            sleep 8
+            docker compose ps
+            docker compose logs --tail 20 bot
+            docker compose logs --tail 50 bot | grep -q "Бот запущен" || { echo "::error::Бот не запустился"; exit 1; }

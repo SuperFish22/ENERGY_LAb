@@ -71,25 +71,25 @@ def test_full_flow(client, db):
     ev = db.get(m.Event, ev_id)
     db.refresh(ev)
     station_ids = [s.id for s in ev.stations]
-    plans = {"oleg@energy.local": [5, 4, 3], "script@energy.local": [4, 4, 2], "tech@energy.local": [5, 3, 3],
-             "smi@energy.local": [4, 5, 2]}
+    plans = {"oleg@energy.local": [10, 8, 6], "script@energy.local": [8, 8, 3], "tech@energy.local": [10, 6, 6],
+             "smi@energy.local": [8, 10, 3]}
     for email, st_scores in plans.items():
         c = _expert_login(email)
         ex = next(e for e in experts if e.user.email == email)
         crits = [cr.id for cr in ex.department.criteria]
         ev_page = f"{page}/evaluate"
-        data = {f"score_{cid}": "4" for cid in crits} | {"action": "submit", "station_id": ""}
+        data = {f"score_{cid}": "8" for cid in crits} | {"action": "submit", "station_id": ""}
         assert c.form(ev_page, data, ev_page).status_code == 303
         for sid, sc in zip(station_ids, st_scores, strict=True):
             data = {f"score_{cid}": str(sc) for cid in crits}
-            data |= {"action": "submit", "station_id": str(sid), "probability": "2" if sc > 2 else "4",
-                     "impact": "2" if sc > 2 else "4"}
-            if sc <= 2:
+            data |= {"action": "submit", "station_id": str(sid), "probability": "3" if sc > 3 else "8",
+                     "impact": "3" if sc > 3 else "8"}
+            if sc <= 3:
                 data |= {f"comment_{cid}": "Нужна доработка" for cid in crits}
             assert c.form(ev_page, data, ev_page).status_code == 303
         # чужой отдел оценивать нельзя
         other = db.scalar(select(m.Criterion).where(m.Criterion.department_id != ex.department_id))
-        bad = c.form(ev_page, {f"score_{other.id}": "3", "action": "submit", "station_id": ""}, ev_page)
+        bad = c.form(ev_page, {f"score_{other.id}": "6", "action": "submit", "station_id": ""}, ev_page)
         assert bad.status_code == 403
 
     # балл 1 без комментария не сохраняется
@@ -100,14 +100,14 @@ def test_full_flow(client, db):
     db.expire_all()
     e = db.scalar(select(m.Evaluation).where(m.Evaluation.expert_id == tech.id, m.Evaluation.criterion_id == cid,
                                              m.Evaluation.station_id.is_(None)))
-    assert e.score == 4
+    assert e.score == 8
 
     # 4. закрытие тура, прогноз, утверждение
     assert head.form(f"{page}/rounds/close", {}, page).status_code == 303
     assert head.form(f"{page}/forecast", {}, page).status_code == 303
     db.expire_all()
     fc = db.scalar(select(m.Forecast).where(m.Forecast.event_id == ev_id).order_by(m.Forecast.id.desc()))
-    assert fc.expert_score is not None and 1 <= fc.expert_score <= 5
+    assert fc.expert_score is not None and 1 <= fc.expert_score <= 10
     assert fc.attendance is not None and fc.attendance <= 50
     assert fc.analogs and len(fc.analogs) == 3
     assert db.get(m.Event, ev_id).status == "evaluated"
@@ -124,7 +124,7 @@ def test_full_flow(client, db):
     db.expire_all()
     assert len(db.scalars(select(m.Ticket).where(m.Ticket.event_id == ev_id)).all()) == 2   # без дублей
     fb_page = f"/e/{code}/feedback"
-    r = client.form(fb_page, {"rating": "5", "nps": "9", "email": "anya@x.ru", f"st_{station_ids[0]}": "5"}, fb_page)
+    r = client.form(fb_page, {"rating": "9", "nps": "9", "email": "anya@x.ru", f"st_{station_ids[0]}": "9"}, fb_page)
     assert r.status_code == 303
     r2 = client.form(fb_page, {"rating": "1"}, fb_page)
     assert "thanks" not in r2.headers["location"]                                          # повтор отклонён
@@ -140,10 +140,10 @@ def test_full_flow(client, db):
     head.form(f"{page}/review", {"avg_rating": "", "finalize": "1"}, page)            # без оценки не завершить
     db.expire_all()
     assert db.get(m.Event, ev_id).status == "held"
-    r = head.form(f"{page}/review", {"avg_rating": "4,6", "lessons": "Больше времени на финал", "finalize": "1"},
+    r = head.form(f"{page}/review", {"avg_rating": "9,1", "lessons": "Больше времени на финал", "finalize": "1"},
                   page)
     assert r.status_code == 303
-    head.form(f"{page}/review", {"avg_rating": "4,6", "finalize": "1"}, page)          # повтор не дублирует
+    head.form(f"{page}/review", {"avg_rating": "9,1", "finalize": "1"}, page)          # повтор не дублирует
     db.expire_all()
     assert db.get(m.Event, ev_id).status == "analyzed"
     hist = db.scalars(select(m.CompetenceHistory).where(m.CompetenceHistory.event_id == ev_id)).all()
@@ -167,7 +167,7 @@ def test_bot_api(client, db):
     assert tasks and tasks[0]["title"]
     r = client.post(f"/api/bot/tasks/{tasks[0]['id']}/status",
                     json={"channel": "telegram", "user_id": "555", "status": "done"}, headers=BOT)
-    assert r.json()["status_name"] == "Готово"
+    assert r.json()["status_name"] == "На проверке"          # чужую задачу исполнитель сдаёт на проверку автору
     # вопрос на обсуждение в отдел
     r = client.post("/api/bot/discussions", json={"channel": "telegram", "user_id": "555", "department_code": "TECH",
                                                   "title": "Нужен второй проектор?", "text": "Для зала реликвии"},
@@ -178,10 +178,12 @@ def test_bot_api(client, db):
     # непривязанный пользователь
     r = client.get("/api/bot/tasks", params={"channel": "vk", "user_id": "999"}, headers=BOT)
     assert r.status_code == 404
-    # SOS не попадает на доску и возвращает дежурных
-    r = client.post("/api/bot/sos", json={"channel": "vk", "user_id": "777", "text": "Плохо гостю"}, headers=BOT)
-    assert r.status_code == 200 and "112" in r.json()["reply"]
-    assert "Плохо гостю" not in client.get("/board").text
+    # SOS убран (spec 005); сообщение гостя уходит в поддержку и не попадает на доску
+    assert client.post("/api/bot/sos", json={"channel": "vk", "user_id": "777"}, headers=BOT).status_code == 404
+    r = client.post("/api/bot/support", json={"channel": "vk", "user_id": "777", "text": "Плохо слышно ведущего"},
+                    headers=BOT)
+    assert r.status_code == 200 and r.json()["new"] is True
+    assert "Плохо слышно" not in client.get("/board").text
     # очередь уведомлений: задача привязанному пользователю → уведомление в его Telegram
     head = Client(app).__enter__().login(*HEAD)
     head.form("/cabinet/tasks", {"title": "Проверить проектор", "assignee_id": str(user.id)}, "/cabinet/tasks")

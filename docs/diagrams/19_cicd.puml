@@ -1,0 +1,47 @@
+@startuml
+!include _style.iuml
+skinparam defaultFontSize 14
+start
+:git push в ветку main;
+fork
+  partition "Сайт: проверка (CI)" {
+    :ruff — стиль кода;
+    :pytest — 107 тестов,\nпокрытие app/expertise ≥ 90 %;
+    :миграции и демо-данные\nна PostgreSQL 16;
+    :сборка Docker-образа;
+  }
+  if (CI успешен?) then (да)
+    partition "Сайт: выкладка на сервер в РФ" {
+      :публикация образа в GitHub\nContainer Registry;
+      :ручное подтверждение\n(окружение production);
+      :SSH: git pull, docker compose\npull и up;
+      :проверка /health;
+    }
+  else (нет)
+    :выкладки нет;
+  endif
+fork again
+  if (Изменена папка bot/?) then (да)
+    partition "Бот: проверка" {
+      :ruff — стиль кода бота;
+      :тесты бота через API сайта;
+    }
+    partition "Бот: выкладка на внешний сервер" {
+      :копирование кода бота\nпо SCP;
+      :SSH: сборка образа\nи перезапуск контейнера;
+    }
+  else (нет)
+  endif
+end fork
+stop
+
+legend bottom left
+  <b>Обозначения</b>
+  | закрашенный круг | начало конвейера |
+  | круг в обводке | окончание конвейера |
+  | прямоугольник со скруглением | шаг конвейера |
+  | рамка с заголовком | задание GitHub Actions |
+  | ромб | проверка условия |
+  | жирная горизонтальная черта | разветвление и слияние параллельных потоков |
+endlegend
+@enduml

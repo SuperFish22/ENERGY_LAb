@@ -1,0 +1,17 @@
+{#- Список вложений. Нужны: items, delete_base (URL без /{id}/delete), can_delete_owner (id владельца), user, csrf_token. -#}
+<ul class="attach-list">
+  {% for a in items %}
+  <li class="attach">
+    <span class="attach-badge {{ 'is-link attach-' ~ a.provider if a.kind == 'link' else 'is-file' }}" aria-hidden="true">{{ (a.ext or 'FILE')[:4] if a.kind == 'file' else ('Я' if a.provider == 'yandex' else 'G') }}</span>
+    <div class="attach-main">
+      {% if a.kind == 'file' %}<a href="/cabinet/files/{{ a.id }}">{{ a.title }}</a>
+      {% else %}<a href="{{ a.url }}" target="_blank" rel="noopener noreferrer">{{ a.title }}<span class="sr"> (откроется в новой вкладке)</span></a>{% endif %}
+      <span class="attach-meta">{% if a.kind == 'file' %}{{ a.ext }}{% if a.size %} · {{ a.size|filesize }}{% endif %}{% else %}{{ a.provider_name }}{% endif %} · {{ a.uploader.full_name if a.uploader else '—' }} · {{ a.created_at.strftime('%d.%m.%Y') }}</span>
+    </div>
+    {% if user.has_role('head') or a.uploaded_by == user.id or owner_id == user.id %}
+    <form method="post" action="{{ delete_base }}/{{ a.id }}/delete" class="attach-del"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="btn-link" aria-label="Удалить «{{ a.title }}»">Удалить</button></form>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>

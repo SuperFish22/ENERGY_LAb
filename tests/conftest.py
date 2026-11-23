@@ -10,6 +10,7 @@ os.environ["BOT_API_TOKEN"] = "test-bot-token"
 os.environ["ADMIN_EMAIL"] = "head@test.local"
 os.environ["ADMIN_PASSWORD"] = "head-password"
 os.environ["MEDIA_DIR"] = tempfile.mkdtemp(prefix="lab-media-")
+os.environ["FILES_DIR"] = tempfile.mkdtemp(prefix="lab-files-")
 
 from fastapi.testclient import TestClient  # noqa: E402
 

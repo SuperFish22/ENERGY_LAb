@@ -1,0 +1,133 @@
+@startuml
+!include _style.iuml
+skinparam defaultFontSize 13
+skinparam monochrome false
+skinparam ClassBackgroundColor white
+skinparam ClassBorderColor black
+hide circle
+hide methods
+skinparam linetype ortho
+entity forecasts {
+  *id : INT <<PK>>
+  --
+  event_id : INT <<FK>>
+  created_at : TIMESTAMP
+  expert_score : FLOAT
+  kendall_w : FLOAT
+  variation : FLOAT
+  attendance : INT
+  attendance_low : INT
+  attendance_high : INT
+  tickets_sold : INT
+  revenue : FLOAT
+  budget : FLOAT
+  avg_rating : FLOAT
+  failure_risk : FLOAT
+  recommendation : VARCHAR(40)
+  reasons : JSON
+  analogs : JSON
+  params : JSON
+}
+entity decisions {
+  *id : INT <<PK>>
+  --
+  event_id : INT <<FK>>
+  decision : VARCHAR(20)
+  comment : TEXT
+  decided_by : INT <<FK>>
+  created_at : TIMESTAMP
+}
+entity event_results {
+  *id : INT <<PK>>
+  --
+  event_id : INT <<FK>>
+  guests_count : INT
+  tickets_sold : INT
+  revenue : NUMERIC(12, 2)
+  actual_cost : NUMERIC(12, 2)
+  avg_rating : FLOAT
+  lessons : TEXT
+  reviewed_at : TIMESTAMP
+}
+entity tickets {
+  *id : INT <<PK>>
+  --
+  event_id : INT <<FK>>
+  external_order_id : VARCHAR(60) <<UK>>
+  buyer_name : VARCHAR(150)
+  email : VARCHAR(120)
+  price : NUMERIC(10, 2)
+  status : VARCHAR(20)
+  purchased_at : TIMESTAMP
+}
+entity feedback {
+  *id : INT <<PK>>
+  --
+  event_id : INT <<FK>>
+  ticket_id : INT <<FK>>
+  rating : SMALLINT
+  nps : SMALLINT
+  comment : TEXT
+  is_anonymous : BOOLEAN
+  excluded : BOOLEAN
+  client_hash : VARCHAR(64)
+  created_at : TIMESTAMP
+}
+entity feedback_stations {
+  *feedback_id : INT <<PK>> <<FK>>
+  *station_id : INT <<PK>> <<FK>>
+  --
+  rating : SMALLINT
+}
+entity party_requests {
+  *id : INT <<PK>>
+  --
+  name : VARCHAR(150)
+  contact : VARCHAR(150)
+  telegram : VARCHAR(32)
+  occasion : VARCHAR(60)
+  format_id : INT <<FK>>
+  wish_date : DATE
+  guests : INT
+  age_group : VARCHAR(20)
+  budget : NUMERIC(12, 2)
+  estimate : NUMERIC(12, 2)
+  message : TEXT
+  status : VARCHAR(20)
+  manager_id : INT <<FK>>
+  note : TEXT
+  created_at : TIMESTAMP
+}
+entity event_formats #DDDDDD {
+  *id : INT <<PK>>
+}
+entity events #DDDDDD {
+  *id : INT <<PK>>
+}
+entity stations #DDDDDD {
+  *id : INT <<PK>>
+}
+entity users #DDDDDD {
+  *id : INT <<PK>>
+}
+event_formats ||--o{ party_requests
+events ||--o{ decisions
+events ||--o{ event_results
+events ||--o{ feedback
+events ||--o{ forecasts
+events ||--o{ tickets
+feedback ||--o{ feedback_stations
+stations ||--o{ feedback_stations
+tickets ||--o{ feedback
+users ||--o{ decisions
+users ||--o{ party_requests
+legend bottom left
+  <b>Обозначения</b>
+  | прямоугольник | таблица: над чертой первичный ключ, под чертой остальные столбцы |
+  | серый прямоугольник только с ключом | таблица из другого рисунка физической модели |
+  | <<PK>> | первичный ключ |
+  | <<FK>> | внешний ключ |
+  | <<UK>> | уникальное значение |
+  | две черты — вилка с кружком | связь «один ко многим» (ноль или много записей) |
+endlegend
+@enduml

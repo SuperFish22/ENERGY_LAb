@@ -15,9 +15,11 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
 
 def test_home_blocks(client):
     html = client.get("/").text
-    for text in ("Мероприятия", "Какие события будут", "Заявка на", "Как рассчитывается стоимость",
-                 "Фотоальбом прошедших тусовок", "Кто создаёт тусовки"):
+    for text in ("Мероприятия", "Какие события будут", "Фотоальбом прошедших тусовок", "Кто создаёт тусовки"):
         assert text in html
+    assert 'action="/request"' not in html and 'href="/order"' in html            # заявка — на отдельной странице
+    order = client.get("/order").text
+    assert 'action="/request"' in order and "Сколько это стоит" in order and 'name="telegram"' in order
     assert "Звёздная новогодняя вечеринка" in html and "скоро продажи" in html     # утверждённое — в календаре
     assert client.get("/e/LAB-2026-09").status_code == 404                        # но без страницы продаж
     assert client.get("/archive").status_code == 200
@@ -37,16 +39,16 @@ def test_pricing_formula(db):
 
 
 def test_party_request_flow(client, db):
-    tok = client.csrf("/")
+    tok = client.csrf("/order")
     form = {"csrf_token": tok, "name": "Ира", "contact": "+7 900 000-00-00", "occasion": "День рождения",
             "guests": "25", "message": "Квест для 14-летних"}
     r = client.post("/request", data=form, follow_redirects=False)
-    assert r.headers["location"] == "/#request"
+    assert r.headers["location"] == "/order#request"
     assert not db.scalar(select(m.PartyRequest).where(m.PartyRequest.name == "Ира"))   # нет согласия
-    assert "Нужно согласие" in client.get("/").text
+    assert "Нужно согласие" in client.get("/order").text
     client.post("/request", data=form | {"consent": "1", "website": "spam"})        # бот-ловушка
     assert not db.scalar(select(m.PartyRequest).where(m.PartyRequest.name == "Ира"))
-    client.post("/request", data=form | {"consent": "1", "csrf_token": client.csrf("/")})
+    client.post("/request", data=form | {"consent": "1", "csrf_token": client.csrf("/order")})
     db.expire_all()
     pr = db.scalar(select(m.PartyRequest).where(m.PartyRequest.name == "Ира"))
     assert pr and pr.estimate and pr.status == "new"
@@ -60,6 +62,36 @@ def test_party_request_flow(client, db):
     assert db.get(m.PartyRequest, pr.id).status == "in_work"
     member = Client(app).__enter__().login("member@energy.local")
     assert member.get("/cabinet/requests").status_code == 403
+
+
+def test_parse_telegram():
+    from app.routers.public import parse_telegram
+    for raw in ("@energy_lab", "energy_lab", "t.me/energy_lab", "https://t.me/energy_lab", "https://telegram.me/energy_lab/",
+                "  https://t.me/energy_lab?start=1 "):
+        assert parse_telegram(raw) == "energy_lab", raw
+    assert parse_telegram("") is None
+    for bad in ("ab", "@1abcde", "имя_кириллицей", "https://example.com/x", "a b c d e"):
+        try:
+            parse_telegram(bad)
+            raise AssertionError(bad)
+        except ValueError:
+            pass
+
+
+def test_request_with_telegram_only(client, db):
+    base = {"name": "Лёша", "contact": "", "occasion": "Выпускной", "guests": "40", "consent": "1"}
+    r = client.post("/request", data=base | {"telegram": "@не_ник", "csrf_token": client.csrf("/order")},
+                    follow_redirects=False)
+    assert r.headers["location"] == "/order#request"
+    assert "Ник в Telegram выглядит неверно" in client.get("/order").text
+    client.post("/request", data=base | {"telegram": "https://t.me/lesha_party", "csrf_token": client.csrf("/order")})
+    pr = db.scalar(select(m.PartyRequest).where(m.PartyRequest.name == "Лёша"))
+    assert pr and pr.telegram == "lesha_party" and pr.contact == ""
+    head = Client(app).__enter__().login(*HEAD)
+    assert 'href="https://t.me/lesha_party"' in head.get("/cabinet/requests").text
+    # без единого контакта заявка не принимается
+    client.post("/request", data=base | {"name": "Без контактов", "csrf_token": client.csrf("/order")})
+    assert not db.scalar(select(m.PartyRequest).where(m.PartyRequest.name == "Без контактов"))
 
 
 def test_photo_upload(client, db):
@@ -115,7 +147,7 @@ def test_team_slider_and_site_settings(client, db):
     cfg = site.pricing(db)
     assert cfg["team_per_hour"] == 3000 and cfg["margin"] == 0.1
     assert list(cfg["options"].values()) == [["Аниматор", 3500]]
-    assert "Аниматор" in client.get("/").text
+    assert "Аниматор" in client.get("/order").text
     db.delete(db.get(m.SiteSetting, "pricing"))                                     # вернуть значения по умолчанию
     db.delete(db.get(m.SiteSetting, "texts"))
     db.commit()

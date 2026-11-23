@@ -1,0 +1,28 @@
+{% extends "cabinet/_layout.html" %}
+{% block page_title %}Уведомления{% endblock %}
+{% block main %}
+<header class="tasks-head">
+  <h1 style="font-size:2rem">Уведомления</h1>
+  <nav class="seg" aria-label="Какие показать">
+    <a href="/cabinet/notifications" {% if show == 'all' %}aria-current="page"{% endif %}>Все</a>
+    <a href="/cabinet/notifications?show=unread" {% if show == 'unread' %}aria-current="page"{% endif %}>Непрочитанные{% if unread %} · {{ unread }}{% endif %}</a>
+  </nav>
+</header>
+<div class="note-bar">
+  <p class="muted small">Те же уведомления приходят в {% if user.telegram_id and user.notify_channel == 'telegram' %}Telegram{% elif user.vk_id and user.notify_channel == 'vk' %}ВКонтакте{% else %}мессенджер, если привязать его в <a href="/cabinet/profile#bot">профиле</a>{% endif %}.</p>
+  {% if unread %}<form method="post" action="/cabinet/notifications/read"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn btn-small">Прочитать все</button></form>{% endif %}
+</div>
+<ul class="notes">
+  {% for n in items %}
+  <li class="note{% if not n.read_at %} is-unread{% endif %}">
+    <a href="/cabinet/notifications/{{ n.id }}">
+      <span class="note-kind note-{{ n.kind }}">{{ kinds.get(n.kind, 'Система') }}</span>
+      <span class="note-text">{{ n.text }}</span>
+      <span class="note-time">{{ n.created_at.strftime('%d.%m %H:%M') }}{% if not n.read_at %}<span class="sr"> — не прочитано</span>{% endif %}</span>
+    </a>
+  </li>
+  {% else %}
+  <li class="note-empty">{% if show == 'unread' %}Всё прочитано.{% else %}Уведомлений пока нет. Здесь появятся новые задачи, изменения в них, решения по проектам и ответы в обсуждениях.{% endif %}</li>
+  {% endfor %}
+</ul>
+{% endblock %}

@@ -1,5 +1,6 @@
 """Публичный сайт Energy Lab (ЧТЗ-2): главная, афиша, карточка мероприятия, анкета гостя, доска вопросов."""
 import hashlib
+import re
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
@@ -8,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import models as m
-from app import pricing, site
+from app import pricing, site, support
 from app.db import get_db
 from app.deps import csrf, current_user_optional, flash, render
 from app.notify import notify_heads
@@ -46,47 +47,75 @@ def home(request: Request, db: Session = Depends(get_db), user=Depends(current_u
     depts = db.scalars(select(m.Department).order_by(m.Department.weight.desc(), m.Department.id)).all()
     crew = dict(db.execute(select(m.Expert.department_id, func.count()).join(m.User)
                            .where(m.User.is_active.is_(True)).group_by(m.Expert.department_id)).all())
-    cfg = site.pricing(db)
-    rates = pricing.per_guest_rates(db, cfg)
-    groups = sorted({f.group_name for f in formats})
     team = db.scalars(select(m.TeamMember).where(m.TeamMember.is_public.is_(True), m.TeamMember.consent.is_(True))
                       .order_by(m.TeamMember.order_no, m.TeamMember.id)).all()
     return render(request, "public/home.html", {
         "user": user, "next_launch": upcoming[0] if upcoming else None, "upcoming": upcoming[:6],
-        "months": months, "past": past, "formats": formats, "groups": groups, "departments": depts, "crew": crew,
-        "stats": _stats(db), "rates": rates, "pricing": cfg, "occasions": OCCASIONS, "age_groups": AGE_GROUPS,
+        "months": months, "past": past, "formats": formats, "departments": depts, "crew": crew,
+        "stats": _stats(db), "team": team, "texts": site.texts(db)})
+
+
+@router.get("/order")
+def order(request: Request, db: Session = Depends(get_db), user=Depends(current_user_optional)):
+    """Заказать мероприятие: заявка и калькулятор стоимости на отдельной странице (ЧТЗ М02)."""
+    formats = db.scalars(select(m.EventFormat).where(~m.EventFormat.code.endswith("0"))).all()
+    cfg = site.pricing(db)
+    rates = pricing.per_guest_rates(db, cfg)
+    groups = sorted({f.group_name for f in formats})
+    return render(request, "public/order.html", {
+        "user": user, "active": "order", "formats": formats, "groups": groups, "rates": rates, "pricing": cfg,
+        "occasions": OCCASIONS, "age_groups": AGE_GROUPS, "texts": site.texts(db),
         "sample": pricing.estimate(rates, "Квестовые" if "Квестовые" in groups else (groups or [""])[0], 20,
                                    options=list(cfg["options"])[:1], cfg=cfg),
-        "team": team, "texts": site.texts(db),
         "rf": request.session.pop("request_form", None) or {}})
+
+
+TG_NICK = re.compile(r"^[A-Za-z][A-Za-z0-9_]{4,31}$")
+
+
+def parse_telegram(value: str) -> str | None:
+    """«@nick», «nick», «t.me/nick», «https://t.me/nick» → «nick». Пусто → None. Неверный ник → ValueError."""
+    v = (value or "").strip()
+    if not v:
+        return None
+    v = re.sub(r"^(https?://)?(www\.)?(t\.me|telegram\.me)/", "", v, flags=re.I).lstrip("@").split("?")[0].strip("/")
+    if not TG_NICK.match(v):
+        raise ValueError(v)
+    return v
 
 
 @router.post("/request", dependencies=[Depends(csrf)])
 async def party_request(request: Request, db: Session = Depends(get_db)):
-    """Заявка на создание тусовки: сохраняется в БД в РФ, руководители получают уведомление без контактов."""
+    """Заявка на мероприятие: сохраняется в БД в РФ, руководители получают уведомление без контактов."""
     form = await request.form()
     g = lambda k: (form.get(k) or "").strip()  # noqa: E731
     errors = []
     name, contact, text = g("name")[:150], g("contact")[:150], g("message")[:2000]
+    try:
+        telegram = parse_telegram(g("telegram"))
+    except ValueError:
+        telegram = None
+        errors.append("Ник в Telegram выглядит неверно: латиница, цифры и «_», от 5 символов, например @energy_lab "
+                      "или ссылка t.me/energy_lab")
     try:
         guests = int(g("guests") or 0)
     except ValueError:
         guests = 0
     if not name:
         errors.append("Как к вам обращаться?")
-    if len(contact) < 5:
-        errors.append("Оставьте телефон, e-mail или ник в мессенджере, чтобы мы связались с вами")
+    if len(contact) < 5 and not telegram and not any("Telegram" in e for e in errors):
+        errors.append("Оставьте телефон, e-mail или ник в Telegram, чтобы мы связались с вами")
     if not 1 <= guests <= 1000:
         errors.append("Сколько будет гостей? От 1 до 1000")
     if g("consent") != "1":
         errors.append("Нужно согласие на обработку данных — без него мы не можем вам перезвонить")
     if g("website"):                       # ловушка для ботов: скрытое поле должно быть пустым
-        return RedirectResponse("/#request", 303)
+        return RedirectResponse("/order#request", 303)
     if errors:
         flash(request, ". ".join(errors), "error")
-        request.session["request_form"] = {k: g(k) for k in ("name", "contact", "occasion", "format_id", "wish_date",
-                                                              "guests", "age_group", "budget", "message")}
-        return RedirectResponse("/#request", 303)
+        request.session["request_form"] = {k: g(k) for k in ("name", "contact", "telegram", "occasion", "format_id",
+                                                              "wish_date", "guests", "age_group", "budget", "message")}
+        return RedirectResponse("/order#request", 303)
     fmt = db.get(m.EventFormat, int(g("format_id"))) if g("format_id").isdigit() else None
     try:
         wish = date.fromisoformat(g("wish_date")) if g("wish_date") else None
@@ -99,17 +128,17 @@ async def party_request(request: Request, db: Session = Depends(get_db)):
     cfg = site.pricing(db)
     est = pricing.estimate(pricing.per_guest_rates(db, cfg), fmt.group_name if fmt else "Развлекательные", guests,
                            cfg=cfg)
-    pr = m.PartyRequest(name=name, contact=contact, occasion=(g("occasion") or "Другое")[:60],
+    pr = m.PartyRequest(name=name, contact=contact, telegram=telegram, occasion=(g("occasion") or "Другое")[:60],
                         format_id=fmt.id if fmt else None, wish_date=wish, guests=guests,
                         age_group=g("age_group")[:20] or None, budget=budget, estimate=est["total"],
                         message=text or None)
     db.add(pr)
     db.flush()
-    notify_heads(db, f"Новая заявка на тусовку №{pr.id}: {pr.occasion}, {guests} гостей", "/cabinet/requests")
+    notify_heads(db, f"Новая заявка на мероприятие №{pr.id}: {pr.occasion}, {guests} гостей", "/cabinet/requests")
     db.commit()
     request.session.pop("request_form", None)
     flash(request, f"Заявка №{pr.id} принята. Продюсер свяжется с вами в течение двух рабочих дней")
-    return RedirectResponse("/#request", 303)
+    return RedirectResponse("/order#request", 303)
 
 
 @router.get("/archive")
@@ -162,8 +191,8 @@ async def feedback_send(code: str, request: Request, db: Session = Depends(get_d
         rating = int(form.get("rating", 0))
     except ValueError:
         rating = 0
-    if not 1 <= rating <= 5:
-        flash(request, "Поставьте оценку мероприятию от 1 до 5", "error")
+    if not 1 <= rating <= 10:
+        flash(request, "Поставьте оценку мероприятию от 1 до 10", "error")
         return RedirectResponse(f"/e/{code}/feedback", 303)
     ip = request.client.host if request.client else ""
     client_hash = hashlib.sha256(f"{ev.id}:{ip}:{request.headers.get('user-agent', '')}".encode()).hexdigest()
@@ -181,14 +210,20 @@ async def feedback_send(code: str, request: Request, db: Session = Depends(get_d
                     is_anonymous=ticket is None, client_hash=client_hash)
     db.add(fb)
     db.flush()
-    for st in ev.stations:
+    for st in ev.rated_stations:
         v = form.get(f"st_{st.id}")
-        if v and v.isdigit() and 1 <= int(v) <= 5:
+        if v and v.isdigit() and 1 <= int(v) <= 10:
             db.add(m.FeedbackStation(feedback_id=fb.id, station_id=st.id, rating=int(v)))
     db.commit()
     resp = RedirectResponse(f"/e/{code}?thanks=1", 303)
     resp.set_cookie(f"fb_{ev.id}", "1", max_age=60 * 60 * 24 * 30, httponly=True, samesite="lax")
     return resp
+
+
+@router.get("/faq")
+def faq(request: Request, db: Session = Depends(get_db), user=Depends(current_user_optional)):
+    groups = support.faq_by_topic(support.faq_items(db))
+    return render(request, "public/faq.html", {"user": user, "groups": groups})
 
 
 @router.get("/board")

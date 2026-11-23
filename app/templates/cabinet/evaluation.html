@@ -1,0 +1,33 @@
+{% extends "cabinet/_layout.html" %}{% set nav = 'evaluation' %}
+{% block page_title %}Оценка проектов{% endblock %}
+{% block main %}
+<header><div><h1 style="font-size:2rem;margin:0">Оценка проектов</h1>
+  <p class="muted">Экспертиза пятью отделами, прогноз и решение руководителей, итоговая оценка после мероприятия. Карточка проекта — отдельно, здесь только оценка.</p></div>
+  <a class="btn" href="/cabinet/evaluation/how">Как считается оценка</a></header>
+
+{% if waiting %}
+<section class="panel eval-wait">
+  <h2>Ждут вашей оценки</h2>
+  {% for r in waiting %}<p class="row-actions"><b>{{ r.ev.title }}</b><span class="muted small">тур {{ r.round.round_no }}{% if r.round.deadline %} · срок {{ r.round.deadline|ru_date }}{% endif %}</span><a class="btn btn-launch btn-small" href="/cabinet/projects/{{ r.ev.id }}/evaluate">Оценить</a></p>{% endfor %}
+</section>
+{% endif %}
+
+<nav class="tabs" aria-label="Этап"><a href="/cabinet/evaluation" {% if not stage %}aria-current="page"{% endif %}>Все</a>{% for k, label, _ in stages %}<a href="?stage={{ k }}" {% if stage == k %}aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}</nav>
+
+<div class="panel table-wrap" style="padding:0"><table class="eval-table">
+  <thead><tr><th>Проект</th><th>Статус</th><th>Экспертиза</th><th class="num">Оценка S</th><th>Риски</th><th>Рекомендация</th><th class="num">Гости, факт</th></tr></thead>
+  <tbody>
+  {% for r in rows %}{% set ev = r.ev %}
+  <tr>
+    <td><a href="/cabinet/evaluation/{{ ev.id }}">{{ ev.title }}</a><div class="muted small">{{ ev.code }} · {{ ev.planned_date|ru_date }}</div></td>
+    <td><span class="status status-{{ ev.status }}">{{ ev.status_name }}</span></td>
+    <td>{% if r.round %}тур {{ r.round.round_no }} · {{ 'идёт' if r.round.is_open else 'закрыт' }}<div class="muted small">отправили {{ r.sent }} из {{ r.assigned }}{% if r.round.kendall_w is not none %} · W = {{ r.round.kendall_w|num }}{% endif %}</div>{% else %}<span class="muted">не начата</span>{% endif %}</td>
+    <td class="num">{% if r.S is not none %}<b class="score score-{{ 'low' if r.S < 3 else 'mid' if r.S < 3.5 else 'ok' }}">{{ r.S|num }}</b>{% else %}—{% endif %}</td>
+    <td>{% if r.has_red %}<span class="zone-red">есть красная зона</span>{% elif r.round and not r.round.is_open %}<span class="zone-green">без красных</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+    <td>{{ r.forecast.recommendation if r.forecast else '—' }}</td>
+    <td class="num">{{ ev.result.guests_count if ev.result else '—' }}{% if r.forecast and r.forecast.attendance is not none %}<div class="muted small">прогноз {{ r.forecast.attendance }}</div>{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="7" class="empty">{% if stage %}На этом этапе проектов нет.{% else %}Проектов на оценке пока нет. Проект попадает сюда, когда автор отправляет его на экспертизу.{% endif %}</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+{% endblock %}

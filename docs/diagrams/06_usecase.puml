@@ -1,0 +1,74 @@
+@startuml
+!include _style.iuml
+left to right direction
+skinparam packageStyle rectangle
+skinparam defaultFontSize 14
+skinparam nodesep 18
+skinparam ranksep 70
+actor "Гость /\nпокупатель" as Guest
+actor "Участник Lab" as Member
+actor "Бот" as Bot
+rectangle "ИС Energy Lab" {
+  package "Публичный сайт" {
+    usecase "Смотреть афишу,\nкупить билет" as UC1
+    usecase "Оценить блоки\nмероприятия (1–10)" as UC2
+    usecase "Заказать мероприятие\n(калькулятор, заявка)" as UC3
+    usecase "Найти ответ в FAQ /\nнаписать в поддержку" as UC4
+  }
+  package "Проекты и задачи" {
+    usecase "Создать проект\nи сценарий" as UC5
+    usecase "Работать с задачами\nна доске" as UC6
+    usecase "Прикрепить документы" as UC7
+  }
+  package "Система оценивания" #F4F1FD {
+    usecase "Оценить блоки (1–10)\nи риски P, I" as UC8
+    usecase "Пересмотреть оценку\nво 2-м туре" as UC9
+    usecase "Изучить, как\nсчитается оценка" as UC10
+    usecase "Назначить экспертов,\nоткрыть тур" as UC11
+    usecase "Получить S, V, W, R,\nпрогноз; принять решение" as UC12
+    usecase "Провести итоговую\nоценку (V гостей)" as UC13
+  }
+  package "Поддержка и администрирование" {
+    usecase "Ответить в диалоге\nподдержки" as UC14
+    usecase "Вести FAQ и доску\nвопросов" as UC15
+    usecase "Управлять составом,\nметодикой, сайтом" as UC16
+  }
+}
+actor "Эксперт" as Expert
+actor "Руководитель" as Admin
+actor "Оператор\nподдержки" as Op
+Guest --> UC1
+Guest --> UC2
+Guest --> UC3
+Guest --> UC4
+Member --> UC5
+Member --> UC6
+Member --> UC7
+UC8 <-- Expert
+UC10 <-- Expert
+UC11 <-- Admin
+UC12 <-- Admin
+UC13 <-- Admin
+UC16 <-- Admin
+UC14 <-- Op
+UC15 <-- Op
+Bot --> UC4
+Bot --> UC2
+Bot --> UC14
+UC9 .> UC8 : <<extend>>
+Expert <|-- Admin
+UC1 -[hidden]-> UC11
+UC6 -[hidden]-> UC14
+UC2 -[hidden]-> UC12
+
+legend bottom left
+  <b>Обозначения</b>
+  | фигура человека | актёр (роль пользователя или внешняя система) |
+  | <back:#F4F1FD>   фиолетовая рамка   </back> | подсистема оценивания — предмет разработки |
+  | овал | вариант использования |
+  | сплошная линия | ассоциация актёра с вариантом использования |
+  | линия с треугольником | наследование ролей (руководитель обладает правами эксперта) |
+  | пунктир <<extend>> | расширение: вариант выполняется при определённом условии |
+  | рамка | подсистема ИС |
+endlegend
+@enduml

@@ -1,0 +1,162 @@
+{% extends "cabinet/_layout.html" %}{% set nav = 'evaluation' %}
+{% block page_title %}Как считается оценка{% endblock %}
+{% block main %}
+{%- set zg, zy = method.risk_zones -%}
+<header><div><p class="muted" style="margin:0"><a href="/cabinet/evaluation">Оценка</a></p>
+  <h1 style="font-size:2rem;margin:.2rem 0">Как считается оценка</h1>
+  <p class="muted">Девять карточек — от балла эксперта до решения о запуске. Листайте стрелками, свайпом или клавишами ← →. Всё, что можно потрогать, — живое: цифры считаются по тем же формулам, что и в системе.</p></div></header>
+
+<div class="deck" data-deck>
+  <div class="deck-bar">
+    <button type="button" class="btn btn-small" data-prev aria-label="Предыдущая карточка">←</button>
+    <ol class="deck-dots" aria-label="Карточки">{% for t in ['Путь проекта','Шкала','Отделы','Сложение','Согласие','Риски','Прогноз','Решение','После запуска'] %}<li><button type="button" data-go="{{ loop.index0 }}" aria-label="{{ loop.index }}. {{ t }}"><span>{{ t }}</span></button></li>{% endfor %}</ol>
+    <button type="button" class="btn btn-small" data-next aria-label="Следующая карточка">→</button>
+  </div>
+
+  <div class="deck-track" data-track tabindex="0" aria-roledescription="карусель" aria-label="Как считается оценка">
+
+  <!-- 1 -->
+  <section class="deck-card" aria-roledescription="карточка" aria-label="1 из 9">
+    <p class="deck-step">1 / 9</p>
+    <h2>Путь проекта до запуска</h2>
+    <p>Каждую тусовку до продажи билетов проверяют пять отделов. Оценка — не голосование «нравится или нет», а четыре метода, каждый отвечает на свой вопрос.</p>
+    <ol class="how-route">
+      <li><b>А. Баллы</b><span>Насколько проект хорош по критериям отделов?</span></li>
+      <li><b>Б. Согласие</b><span>Эксперты видят проект одинаково или спорят?</span></li>
+      <li><b>В. Риски</b><span>Какой блок сценария может сорваться?</span></li>
+      <li><b>Г. Прогноз</b><span>Сколько придёт гостей и окупится ли?</span></li>
+      <li><b>Решение</b><span>Утвердить, доработать или отклонить.</span></li>
+    </ol>
+  </section>
+
+  <!-- 2 -->
+  <section class="deck-card" aria-roledescription="карточка" aria-label="2 из 9">
+    <p class="deck-step">2 / 9</p>
+    <h2>Шкала от 1 до 10</h2>
+    <p>Эксперт ставит балл по каждому критерию — за проект целиком и за каждый блок сценария с отметкой «оценивают». Нажмите на балл.</p>
+    <div class="how-scale-demo" role="radiogroup" aria-label="Балл" data-scale>
+      {% for i, t in [(1,'Провал: так делать нельзя, нужна переделка.'),(2,'Провал: блок не работает.'),(3,'Слабо: серьёзные проблемы, без доработки нельзя.'),(4,'Слабо: идея есть, исполнение не тянет.'),(5,'Средне: работает, но гости заскучают.'),(6,'Норма: работает, но без огня.'),(7,'Хорошо: гости уйдут довольными.'),(8,'Очень хорошо: сильный блок.'),(9,'Отлично: об этом будут рассказывать.'),(10,'Вау: лучший блок вечера.')] %}
+      <button type="button" role="radio" aria-checked="{{ 'true' if i == 6 else 'false' }}" data-score="{{ i }}" data-text="{{ t }}">{{ i }}</button>{% endfor %}
+    </div>
+    <p class="how-scale-out" data-scale-out aria-live="polite">Норма: работает, но без огня.</p>
+    <p class="small muted" data-scale-note>При баллах от 1 до 3 комментарий обязателен: автору нужно понять, что исправлять. До закрытия тура эксперты не видят чужих баллов.</p>
+  </section>
+
+  <!-- 3 -->
+  <section class="deck-card" aria-roledescription="карточка" aria-label="3 из 9">
+    <p class="deck-step">3 / 9</p>
+    <h2>Пять отделов — пять взглядов</h2>
+    <p>У каждого отдела свои критерии и свой вес α в итоговой оценке. Нажмите на карточку отдела, чтобы перевернуть её.</p>
+    <div class="how-flips">
+      {% for d in depts %}
+      <button type="button" class="how-flip" data-flip aria-pressed="false">
+        <span class="how-flip-face how-flip-front"><b>{{ d.name }}</b><span class="how-flip-w"><span style="width:{{ (alpha[d.id] * 100 / 0.3)|round(1) if alpha[d.id] < 0.3 else 100 }}%"></span></span><span class="small">α = {{ alpha[d.id]|num }} · {{ (alpha[d.id] * 100)|round|int }}% итога</span></span>
+        <span class="how-flip-face how-flip-back"><b>{{ d.name }}</b>
+          <span class="how-flip-list">{% for c in crits[d.id] %}<span>{{ c.name }}<i>{{ (c.weight * 100)|round|int }}%</i></span>{% endfor %}</span></span>
+      </button>
+      {% endfor %}
+    </div>
+    <p class="small muted">Веса отделов и критериев руководитель меняет в «Методике». Здесь показаны текущие.</p>
+  </section>
+
+  <!-- 4 -->
+  <section class="deck-card" aria-roledescription="карточка" aria-label="4 из 9">
+    <p class="deck-step">4 / 9</p>
+    <h2>Как баллы складываются в S</h2>
+    <p>Метод А. Баллы экспертов усредняются с учётом компетентности: голос опытного эксперта весит больше (коэффициент от {{ method.competence_bounds[0]|num(1) }} до {{ method.competence_bounds[1]|num(1) }}). Затем средние по критериям складываются по весам в балл отдела, а отделы — по α в итоговую оценку S. Подвигайте ползунки.</p>
+    <div class="how-calc" data-calc>
+      {% for d in depts %}
+      <div class="how-calc-row" data-alpha="{{ d.weight }}">
+        <label for="cs{{ d.id }}">{{ d.name }}</label>
+        <input id="cs{{ d.id }}" type="range" min="1" max="10" step="0.1" value="{{ [8.2, 6.9, 7.6, 6.4, 8.6][loop.index0 % 5] }}">
+        <output for="cs{{ d.id }}">—</output>
+        <label class="how-calc-off"><input type="checkbox"> не оценил</label>
+      </div>
+      {% endfor %}
+      <p class="how-calc-total">S = <b data-s>—</b> <span class="small muted" data-s-note></span></p>
+    </div>
+    <p class="small muted">Если отдел не выставил оценок, его вес делится между остальными — проект не наказывается за чужую занятость, но руководитель видит предупреждение.</p>
+  </section>
+
+  <!-- 5 -->
+  <section class="deck-card" aria-roledescription="карточка" aria-label="5 из 9">
+    <p class="deck-step">5 / 9</p>
+    <h2>Согласны ли эксперты</h2>
+    <p>Метод Б. Каждый эксперт по своим баллам выстраивает блоки сценария от лучшего к худшему. Коэффициент Кендалла W показывает, насколько эти очереди совпадают: 1 — все расставили одинаково, 0 — каждый по-своему.</p>
+    <div class="how-w-demo" data-w>
+      <label for="wv">W = <output data-w-out>0,70</output></label>
+      <input id="wv" type="range" min="0" max="1" step="0.01" value="0.7" data-threshold="{{ method.w_threshold }}">
+      <div class="how-w-ranks" aria-hidden="true">
+        <div><span>Эксперт 1</span><i>Квест</i><i>Квиз</i><i>Финал</i></div>
+        <div><span>Эксперт 2</span><i data-r>Квест</i><i data-r>Квиз</i><i data-r>Финал</i></div>
+      </div>
+      <p class="how-w-verdict" data-w-verdict aria-live="polite"></p>
+    </div>
+    <p>Для каждого блока считается и коэффициент вариации V = σ / x̄ · 100 % — насколько разошлись баллы экспертов. До {{ method.cv_zones[0] }} % оценка блока согласованная, до {{ method.cv_zones[1] }} % — умеренная, выше — несогласованная. V и есть итоговая характеристика надёжности оценки станции.</p>
+    <p class="small muted">Если W ниже {{ method.w_threshold|num(1) }} или V какого-то блока выше {{ method.cv_zones[1] }} %, руководитель открывает второй тур Дельфи: эксперты видят медиану и разброс первого тура и могут пересмотреть баллы. Туров не больше {{ method.max_rounds }}.</p>
+  </section>
+
+  <!-- 6 -->
+  <section class="deck-card" aria-roledescription="карточка" aria-label="6 из 9">
+    <p class="deck-step">6 / 9</p>
+    <h2>Карта рисков</h2>
+    <p>Метод В. Для каждого оцениваемого блока эксперт отвечает на два вопроса: насколько вероятен провал (P) и насколько он заденет мероприятие (I). Риск блока R = P × I. Нажмите на клетку.</p>
+    <div class="how-risk-wrap">
+      <div class="how-risk-grid" role="grid" aria-label="Матрица рисков: вероятность по вертикали, последствия по горизонтали" data-risk data-green="{{ zg }}" data-yellow="{{ zy }}">
+        {% for p in range(10, 0, -1) %}<div role="row" class="how-risk-row"><span class="how-risk-axis" aria-hidden="true">{{ p }}</span>{% for i in range(1,11) %}{% set r = p * i %}<button type="button" role="gridcell" class="how-risk-cell zone-bg-{{ 'green' if r <= zg else 'yellow' if r <= zy else 'red' }}" data-p="{{ p }}" data-i="{{ i }}" aria-label="P {{ p }}, I {{ i }}">{{ r }}</button>{% endfor %}</div>{% endfor %}
+        <div class="how-risk-row how-risk-foot" aria-hidden="true"><span></span>{% for i in range(1,11) %}<span>{{ i }}</span>{% endfor %}</div>
+      </div>
+      <div class="how-risk-out" aria-live="polite" data-risk-out>
+        <p><b>P</b> — вероятность провала, <b>I</b> — последствия: от «гости не заметят» до «сорвётся всё».</p>
+        <p>По вертикали — вероятность P, по горизонтали — последствия I. Зелёная зона — до {{ zg }}, жёлтая — до {{ zy }}, выше — красная.</p>
+      </div>
+    </div>
+    <p class="small muted">Риск всего мероприятия Q = 1 − Π(1 − R/100): чем больше рискованных блоков, тем выше шанс, что что-то пойдёт не так.</p>
+  </section>
+
+  <!-- 7 -->
+  <section class="deck-card" aria-roledescription="карточка" aria-label="7 из 9">
+    <p class="deck-step">7 / 9</p>
+    <h2>Прогноз по похожим тусовкам</h2>
+    <p>Метод Г. Система находит {{ method.k_neighbors }} самых похожих проведённых мероприятий и берёт их явку, оценки гостей и перерасход бюджета — чем ближе аналог, тем больше его вес. Похожесть складывается из признаков:</p>
+    <ul class="how-bars">
+      {% for k, label in [('format','Формат'),('score','Оценка экспертов S'),('price','Цена билета'),('capacity','Вместимость'),('season','Сезон')] %}
+      <li><span>{{ label }}</span><span class="how-bar"><span style="width:{{ (method.feature_weights[k] * 100 / 0.35)|round(1) }}%"></span></span><b>{{ (method.feature_weights[k] * 100)|round|int }}%</b></li>
+      {% endfor %}
+    </ul>
+    <p class="small muted">Чем больше мероприятий проведено и разобрано, тем точнее прогноз. Точность проверяется на «Итоговой оценке»: попал ли факт в прогнозный диапазон.</p>
+  </section>
+
+  <!-- 8 -->
+  <section class="deck-card" aria-roledescription="карточка" aria-label="8 из 9">
+    <p class="deck-step">8 / 9</p>
+    <h2>Рекомендация и решение</h2>
+    <p>Система предлагает, руководитель решает. Правила проверяются по порядку — попробуйте сами:</p>
+    <div class="how-decide" data-decide data-wt="{{ method.w_threshold }}" data-rounds="{{ method.max_rounds }}" data-reject="{{ method.reject_below }}" data-rework="{{ method.rework_below }}">
+      <label for="ds">Оценка S <output data-ds-out>7,40</output></label><input id="ds" type="range" min="1" max="10" step="0.05" value="7.4">
+      <label for="dw">Согласие W <output data-dw-out>0,60</output></label><input id="dw" type="range" min="0" max="1" step="0.01" value="0.6">
+      <label class="how-calc-off"><input type="checkbox" data-dr> Прошло {{ method.max_rounds }} тура Дельфи</label>
+      <label class="how-calc-off"><input type="checkbox" data-dred> Есть блок в красной зоне</label>
+      <label class="how-calc-off"><input type="checkbox" data-dmoney> Затраты больше выручки</label>
+      <div class="how-decide-out" aria-live="polite"><b data-dv>Утвердить</b><ul data-dreasons></ul></div>
+    </div>
+  </section>
+
+  <!-- 9 -->
+  <section class="deck-card" aria-roledescription="карточка" aria-label="9 из 9">
+    <p class="deck-step">9 / 9</p>
+    <h2>После запуска система учится</h2>
+    <p>После мероприятия руководитель вносит факт и оценку гостей. Компетентность эксперта уточняется: чем ближе его оценка к тому, как вышло на самом деле, тем больше будет весить его голос в следующий раз.</p>
+    <div class="how-comp" data-scale="{{ method.scale_max }}" data-comp data-eta="{{ method.eta }}" data-lo="{{ method.competence_bounds[0] }}" data-hi="{{ method.competence_bounds[1] }}">
+      <label for="cc">Было c <output>0,70</output></label><input id="cc" type="range" min="{{ method.competence_bounds[0] }}" max="{{ method.competence_bounds[1] }}" step="0.01" value="0.7">
+      <label for="ce">Оценка эксперта <output>8,9</output></label><input id="ce" type="range" min="1" max="10" step="0.1" value="8.9">
+      <label for="cf">Оценка гостей <output>8,3</output></label><input id="cf" type="range" min="1" max="10" step="0.1" value="8.3">
+      <p class="how-calc-total">Стало c = <b data-c>—</b> <span class="small muted" data-c-note></span></p>
+    </div>
+    <p class="small muted">Шаг обучения η = {{ method.eta|num(1) }}: один удачный или неудачный прогноз не переворачивает репутацию эксперта, но серия — заметно.</p>
+    <p class="row-actions"><a class="btn btn-launch" href="/cabinet/evaluation">К проектам на оценке</a></p>
+  </section>
+  </div>
+</div>
+<script src="/static/js/evaluation-how.js?v={{ ASSET_V }}" defer></script>
+{% endblock %}
